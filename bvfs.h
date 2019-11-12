@@ -64,6 +64,30 @@ void bv_ls();
  *           etc.). Also, print a meaningful error to stderr prior to returning.
  */
 int bv_init(const char *fs_fileName) {
+  // try to open file
+  int pFD = open(partitionName, O_CREAT | O_RDWR | O_EXCL, 0644);
+  if (pFD < 0) {
+    if (errno == EEXIST) {
+      // file already exists
+      pFD = open(partitionName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
+      
+      // open in memory data structures
+
+      return 0;
+    }
+    else {
+      // Something bad must have happened... check errno?
+      printf("%s," strerror(errno));
+      return -1;
+    }
+
+  } else {
+    // File did not previously exist but it does now. Write data to it
+    int num = 0;
+    write(pFD, (void*)&num, PARTITION_SIZE-1);
+    printf("Created File and wrote zero at the end.\n");
+    return 0;
+  }
 }
 
 
