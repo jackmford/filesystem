@@ -43,6 +43,14 @@ int bv_read(int bvfs_FD, void *buf, size_t count);
 int bv_unlink(const char* fileName);
 void bv_ls();
 
+// Global variables
+const int BLOCK_SIZE = 512;
+const int PARTITIION_SIZE = 8388608;
+const int TOTAL_BLOCKS = 16384;
+const int MAX_FILE_SIZE = 65536;
+const int MAX_FILE_BLOCKS = 128;
+const int MAX_FILES = 256;
+const int MAX_FILE_NAME = 32;
 
 
 
