@@ -39,7 +39,7 @@ void bv_ls();
 
 // Global variables
 const int BLOCK_SIZE = 512;
-const int PARTITIION_SIZE = 8388608;
+const int PARTITION_SIZE = 8388608;
 const int TOTAL_BLOCKS = 16384;
 const int MAX_FILE_SIZE = 65536;
 const int MAX_FILE_BLOCKS = 128;
