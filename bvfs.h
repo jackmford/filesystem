@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -81,6 +82,7 @@ int bv_init(const char *fs_fileName) {
   if (pFD < 0) {
     if (errno == EEXIST) {
       // file already exists
+      printf("File already exists.\n");
       pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
       
       // open in memory data structures
@@ -96,8 +98,12 @@ int bv_init(const char *fs_fileName) {
   } else {
     // File did not previously exist but it does now. Write data to it
     int num = 0;
-    write(pFD, (void*)&num, PARTITION_SIZE-1);
+    // seek to position and then write 0 to signify end of file
+    lseek(pFD, PARTITION_SIZE-1, SEEK_CUR);
+    write(pFD, (void*)&num, 1);
     printf("Created File and wrote zero at the end.\n");
+    
+    // open in memory data structures
     return 0;
   }
 }
