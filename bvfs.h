@@ -24,8 +24,13 @@
  *       doesn't already exist.
  */
 
-
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 // Prototypes
 int bv_init(const char *fs_fileName);
@@ -45,7 +50,6 @@ const int MAX_FILE_SIZE = 65536;
 const int MAX_FILE_BLOCKS = 128;
 const int MAX_FILES = 256;
 const int MAX_FILE_NAME = 32;
-
 
 
 /*
@@ -72,6 +76,30 @@ const int MAX_FILE_NAME = 32;
  *           etc.). Also, print a meaningful error to stderr prior to returning.
  */
 int bv_init(const char *fs_fileName) {
+  // try to open file
+  int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
+  if (pFD < 0) {
+    if (errno == EEXIST) {
+      // file already exists
+      pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
+      
+      // open in memory data structures
+
+      return 0;
+    }
+    else {
+      // Something bad must have happened... check errno?
+      printf("%s\n", strerror(errno));
+      return -1;
+    }
+
+  } else {
+    // File did not previously exist but it does now. Write data to it
+    int num = 0;
+    write(pFD, (void*)&num, PARTITION_SIZE-1);
+    printf("Created File and wrote zero at the end.\n");
+    return 0;
+  }
 }
 
 
