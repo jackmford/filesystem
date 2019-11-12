@@ -32,7 +32,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-
 // Prototypes
 int bv_init(const char *fs_fileName);
 int bv_destroy();
@@ -45,13 +44,12 @@ void bv_ls();
 
 // Global variables
 const int BLOCK_SIZE = 512;
-const int PARTITIION_SIZE = 8388608;
+const int PARTITION_SIZE = 8388608;
 const int TOTAL_BLOCKS = 16384;
 const int MAX_FILE_SIZE = 65536;
 const int MAX_FILE_BLOCKS = 128;
 const int MAX_FILES = 256;
 const int MAX_FILE_NAME = 32;
-
 
 
 /*
@@ -79,11 +77,11 @@ const int MAX_FILE_NAME = 32;
  */
 int bv_init(const char *fs_fileName) {
   // try to open file
-  int pFD = open(partitionName, O_CREAT | O_RDWR | O_EXCL, 0644);
+  int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
   if (pFD < 0) {
     if (errno == EEXIST) {
       // file already exists
-      pFD = open(partitionName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
+      pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
       
       // open in memory data structures
 
@@ -91,7 +89,7 @@ int bv_init(const char *fs_fileName) {
     }
     else {
       // Something bad must have happened... check errno?
-      printf("%s," strerror(errno));
+      printf("%s\n", strerror(errno));
       return -1;
     }
 
