@@ -89,53 +89,53 @@ struct iNode inode_arr[256];
  *           etc.). Also, print a meaningful error to stderr prior to returning.
  */
 int bv_init(const char *fs_fileName) {
-  // try to open file
-  int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
+    // Try to open file
+    int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
+    // If file descriptor error
     if (pFD < 0) {
         if (errno == EEXIST) {
             // file already exists
-            printf("File already exists.\n");
             pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
             GLOBAL_PFD = pFD;
-            INIT_FLAG = 1;
+            INIT_FLAG = 1; // Assert we have ran init
 
-            // open in memory data structures
-            // read in structures
-            // superblock, inodes
-
+            // Get the super block position
             lseek(pFD, 0, SEEK_SET);
             int sblock_start;
             read(pFD, &sblock_start, 4);
-            printf("Read super block pos: %d\n",sblock_start);
 
             // Initialize superblock array looking at first superblock
-            // Should get the first superblock that contains at least one usable offset
-            printf("sblock start %d\n", sblock_start);
+            // Should get the first superblock that 
+            // contains at least one usable data block
             short temp = 0;
             int ctr = 0;
             short sarr[256];
-            while(temp == 0){
-              lseek(pFD, sblock_start, SEEK_SET);
-                for (short i = 0; i < 256; i++){
+
+            // If super block contains all null addresses, 
+            // move to another super block and test again
+            // until a super block with an open data block address
+            // is found
+            while(temp == 0) {
+                lseek(pFD, sblock_start, SEEK_SET);
+                for (short i = 0; i < 256; i++) {
                     read(pFD, &temp, 2);
                     sarr[ctr] = temp;
                     ctr++;
-                    if(temp != 0) // Asserts one usable offset
-                      break;
+                    if (temp != 0) // Asserts one usable data block
+                        break;
                 }
-              if(temp == 0)
-                sblock_start = sarr[255] * BLOCK_SIZE;
+                if(temp == 0)
+                    sblock_start = sarr[255] * BLOCK_SIZE;
             }
 
-            printf("stblock start %d\n", sblock_start);
+            // Read in the addresses in that superblock
             lseek(pFD, sblock_start, SEEK_SET);
-            for(short i = 0; i < 256; i++){
-              read(pFD, &temp, 2);
-              superblock_array[i] = temp;
+            for(short i = 0; i < 256; i++) {
+                read(pFD, &temp, 2);
+                superblock_array[i] = temp;
             }
 
-            //lseek(pFD, INODE_START, SEEK_SET);
-            //read(pFD, &arr, sizeof(arr));
+            // Read in iNodes
             lseek(pFD, INODE_START, SEEK_SET);
             read(pFD, &inode_arr, sizeof(inode_arr));
 
@@ -200,10 +200,10 @@ int bv_init(const char *fs_fileName) {
         short blockNum = (76288/BLOCK_SIZE);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
-              if(i*BLOCK_SIZE<PARTITION_SIZE-1)
-                write(pFD, (void*)&i, 2);
-              else
-                write(pFD, "\0\0", 2);
+                if(i*BLOCK_SIZE<PARTITION_SIZE-1)
+                    write(pFD, (void*)&i, 2);
+                else
+                    write(pFD, "\0\0", 2);
             }
             //printf("block num : %d\n",blockNum);
             blockNum += 256;
@@ -235,19 +235,19 @@ int bv_init(const char *fs_fileName) {
  *           returning.
  */
 int bv_destroy() {
-  // Write the iNode array back to file to save changes
-  if(INIT_FLAG == 1){
-    // File has been initialized.
-    lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
-    write(GLOBAL_PFD, (void*)(&inode_arr), sizeof(inode_arr));
-    close(GLOBAL_PFD);
-  }
-  else{
-    // File has not been initialized.
-    char s[] = "File cleanup unsuccesful.\0";
-    write(2, (void*)(s), sizeof(s));
-    return -1;
-  }
+    // Write the iNode array back to file to save changes
+    if(INIT_FLAG == 1){
+        // File has been initialized.
+        lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
+        write(GLOBAL_PFD, (void*)(&inode_arr), sizeof(inode_arr));
+        close(GLOBAL_PFD);
+    }
+    else{
+        // File has not been initialized.
+        char s[] = "File cleanup unsuccesful.\0";
+        write(2, (void*)(s), sizeof(s));
+        return -1;
+    }
 }
 
 
@@ -419,16 +419,16 @@ int bv_unlink(const char* fileName) {
  *   void
  */
 void bv_ls() {
-  int numfiles = 0;
-  for(int i = 0; i<256; i++){
-    if(inode_arr[i].size!=0){
-      numfiles++;
+    int numfiles = 0;
+    for(int i = 0; i<256; i++){
+        if(inode_arr[i].size!=0){
+            numfiles++;
+        }
     }
-  }
-  printf("| %d files\n", numfiles);
-  for(int i = 0; i<256; i++){
-    if(inode_arr[i].size!=0){
-      printf("| bytes: %d, blocks %d, %d, %s\n", inode_arr[i].size, inode_arr[i].size/512, inode_arr[i].time, inode_arr[i].fileName);
+    printf("| %d files\n", numfiles);
+    for(int i = 0; i<256; i++){
+        if(inode_arr[i].size!=0){
+            printf("| bytes: %d, blocks %d, %d, %s\n", inode_arr[i].size, inode_arr[i].size/512, inode_arr[i].time, inode_arr[i].fileName);
+        }
     }
-  }
 }
