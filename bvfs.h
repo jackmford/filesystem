@@ -101,24 +101,21 @@ int bv_init(const char *fs_fileName) {
       
       // open in memory data structures
       // read in structures
-      // superblock, inode 
-      
-      //printf("%ld\n", sizeof(test_inodes));
-      struct superBlockNode arr_superblock[16384];
-      printf("superblocksize: %ld\n", sizeof(arr_superblock));
+      // superblock, inodes
 
       lseek(pFD, 0, SEEK_SET);
-      // seek to zero and read superblock
-      read(pFD, &arr_superblock, sizeof(arr_superblock));
-      printf("read super block, cursor at: %ld", ftell(pFD));
+      short SBS;
+      read(pFD, &SBS, 2);
+      printf("Read and going to seek to pos: %d\n",SBS);
 
-      // seek to size of super block 
-      lseek(pFD, sizeof(arr_superblock), SEEK_SET);
-      struct iNode tnodes[256];
-      printf("size of inodes: %ld\n", sizeof(tnodes));
-      read(pFD, &tnodes, sizeof(tnodes));
-      printf("fname at 0: %s\n", tnodes[0].fileName);
+      lseek(pFD, SBS*512, SEEK_SET);
+      for (short i = SBS; i<SBS+256; i++) {
+        short temp;
+        read(pFD, &temp, 2);
+        printf("Point to block #: %d\n",temp);
+      }
 
+      close(pFD);
       return 0;
     }
     else {
@@ -157,22 +154,20 @@ int bv_init(const char *fs_fileName) {
        256th pointer points to the next super block in the data region.
     */
 
-    lseek(pFD, 0, SEEK_SET);
+    // Get block num and write it to file
+    short tmpNum = 76288/BLOCK_SIZE;
+    lseek(pFD, 0, SEEK_SET); // Seek to 0
+    write(pFD, (void*)(&tmpNum), 2); 
 
-    struct iNode arr_inodes[256];
-    struct iNode t = {"asdf\0", 0, 0, 0};
-    arr_inodes[0] = t;
-    struct superBlockNode arr_superblock[16384];
-    struct superBlockNode te;
-    write(pFD, (void*)&arr_superblock, sizeof(arr_superblock));
-    printf("%ld\n", sizeof(arr_inodes));
-    write(pFD, (void*)&arr_inodes, sizeof(arr_inodes));
-    struct iNode d;
-    printf("%ld\n", sizeof(arr_superblock));
-    lseek(pFD, sizeof(arr_superblock), SEEK_SET);
-    struct iNode test_inodes[256];
-    read(pFD, &test_inodes, sizeof(test_inodes));
-    printf("%s\n", test_inodes[0].fileName);
+    // Seek to 76,288
+    lseek(pFD, 76288, SEEK_SET);
+    short offset = 1;
+    // Write addresses to next 255 blocks
+    for (short i = (76288/BLOCK_SIZE); i<((76288/BLOCK_SIZE)+256);i++){
+        write(pFD, (void*)&i, 2);
+        offset++;
+    }
+
     close(pFD);
     return 0;
   }
