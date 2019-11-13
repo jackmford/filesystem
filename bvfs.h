@@ -136,6 +136,8 @@ int bv_init(const char *fs_fileName) {
 
             //lseek(pFD, INODE_START, SEEK_SET);
             //read(pFD, &arr, sizeof(arr));
+            lseek(pFD, INODE_START, SEEK_SET);
+            read(pFD, &inode_arr, sizeof(inode_arr));
 
             close(pFD);
             return 0;
@@ -180,9 +182,9 @@ int bv_init(const char *fs_fileName) {
 
         // Get block num and write it to file
         struct iNode test = {"hello\n", 1, 1, 0};
-        arr[0] = test;
+        inode_arr[0] = test;
         struct iNode dummy = {"hello dummy\n", 1, 1, 0};
-        arr[200] = dummy;
+        inode_arr[200] = dummy;
 
         int endOfMeta = 76288;
         lseek(pFD, 0, SEEK_SET); // Seek to 0
