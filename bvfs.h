@@ -51,18 +51,11 @@ const int MAX_FILE_SIZE = 65536;
 const int MAX_FILE_BLOCKS = 128;
 const int MAX_FILES = 256;
 const int MAX_FILE_NAME = 32;
-
-// 16384
-// super blocks should also keep track of inodes
-struct superBlockNode {
-  short address; // 2 bytes
-  short availability; // 2 bytes
-//  struct superBlockNode *next; // 4 bytes
-};
+const int INODE_START = 512;
 
 // max of 256 inodes
 struct iNode{
-  char* fileName; // 32 bytes
+  char fileName[32]; // 32 bytes
   int size; // 4 bytes
   int time; // 4 bytes
   short address[128]; // 256 bytes
@@ -117,6 +110,12 @@ int bv_init(const char *fs_fileName) {
         printf("Point to block #: %d\n",temp);
       }
 
+      lseek(pFD, INODE_START, SEEK_SET);
+      struct iNode arr_read[256];
+      read(pFD, &arr_read, sizeof(arr_read));
+      printf("%s\n", arr_read[0].fileName);
+      printf("%s\n", arr_read[200].fileName);
+
       close(pFD);
       return 0;
     }
@@ -156,10 +155,21 @@ int bv_init(const char *fs_fileName) {
        256th pointer points to the next super block in the data region.
     */
 
+    // iNode array to represent all files
+    struct iNode arr[256];
+    struct iNode test = {"hello\n", 0, 0, 0};
+    arr[0] = test;
+    struct iNode dummy = {"hello dummy\n", 0, 0, 0};
+    arr[200] = dummy;
+
     // Get block num and write it to file
     int endOfMeta = 76288;
     lseek(pFD, 0, SEEK_SET); // Seek to 0
     write(pFD, (void*)(&endOfMeta), 4); // Write the start of the super block linked list
+
+    // Seek to end of first superblock
+    lseek(pFD, INODE_START, SEEK_SET);
+    write(pFD, (void*)(&arr), sizeof(arr));
 
     // Go to start of linked list and piece it together
     lseek(pFD, 76288, SEEK_SET);
