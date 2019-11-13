@@ -105,17 +105,19 @@ int bv_init(const char *fs_fileName) {
       
       //printf("%ld\n", sizeof(test_inodes));
       struct superBlockNode arr_superblock[16384];
-      printf("%ld\n", sizeof(arr_superblock));
-      
-
-//      read(pFD, &arr_superblock, sizeof(arr_superblock));
+      printf("superblocksize: %ld\n", sizeof(arr_superblock));
 
       lseek(pFD, 0, SEEK_SET);
+      // seek to zero and read superblock
+      read(pFD, &arr_superblock, sizeof(arr_superblock));
+      printf("read super block, cursor at: %ld", ftell(pFD));
+
+      // seek to size of super block 
       lseek(pFD, sizeof(arr_superblock), SEEK_SET);
       struct iNode tnodes[256];
-      printf("%ld\n", sizeof(tnodes));
+      printf("size of inodes: %ld\n", sizeof(tnodes));
       read(pFD, &tnodes, sizeof(tnodes));
-      printf("%s\n", tnodes[0].fileName);
+      printf("fname at 0: %s\n", tnodes[0].fileName);
 
       return 0;
     }
@@ -128,7 +130,7 @@ int bv_init(const char *fs_fileName) {
   } else {
     // File did not previously exist but it does now. Write data to it
     char nbyte = '\0';
-    // seek to position and then write 0 to signify end of file
+    // seek to position of max parition size - 1 and then write 0 to signify end of file
     lseek(pFD, PARTITION_SIZE-1, SEEK_SET);
     write(pFD, (void*)&nbyte, 1);
     printf("Created File and wrote zero at the end.\n");
@@ -136,9 +138,24 @@ int bv_init(const char *fs_fileName) {
     // create in memory data structures
     // read in structures
     // superblock, inode 
-    // 131072 for superblock
-    // 75776 for inodes
-    // 206848 bytes for metadata
+
+    // 512 bytes for "super block" pointer in beginning
+    // 75,776 bytes for inodes
+    // 76,288 bytes for meta data UNRECOVERABLE
+
+    // 8,388,608 bytes total
+    // minus 76,288 meta data bytes
+    // leaves 8,312,320 bytes for data region
+    /*
+       8,312,320 divided by 512 is 16,235 blocks that need managed.
+       To point to these blocks is going to require 16,235 * 2 bytes (shorts) = 32,470 bytes
+       32,470 divided by 512 is ~64 blocks pointing to data blocks
+    */
+    /*
+       Position to "super block" points to = 76,288th byte.
+       This super block can point to the next 255 blocks.
+       256th pointer points to the next super block in the data region.
+    */
 
     lseek(pFD, 0, SEEK_SET);
 
