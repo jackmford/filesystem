@@ -63,7 +63,7 @@ const int INODE_START = 512;
 int GLOBAL_PFD;
 int INIT_FLAG = 0;
 short superblock_array[256];
-struct iNode arr[256];
+struct iNode inode_arr[256];
 
 /*
  * int bv_init(const char *fs_fileName);
@@ -148,6 +148,7 @@ int bv_init(const char *fs_fileName) {
             read(pFD, &arr_read, sizeof(arr_read));
             printf("%s\n", arr_read[0].fileName);
             printf("%s\n", arr_read[200].fileName);
+            memcpy(inode_arr, arr_read, sizeof(arr_read));
 
             lseek(pFD, 16277 * BLOCK_SIZE, SEEK_SET);
             printf("%d\n", 16277*BLOCK_SIZE);
@@ -185,6 +186,9 @@ int bv_init(const char *fs_fileName) {
               superblock_array[i] = temp;
               printf("%d\n", superblock_array[i]);
             }
+
+            //lseek(pFD, INODE_START, SEEK_SET);
+            //read(pFD, &arr, sizeof(arr));
 
             close(pFD);
             return 0;
@@ -229,9 +233,9 @@ int bv_init(const char *fs_fileName) {
 
         // Get block num and write it to file
         struct iNode test = {"hello\n", 1, 1, 0};
-        arr[0] = test;
+        inode_arr[0] = test;
         struct iNode dummy = {"hello dummy\n", 0, 0, 0};
-        arr[200] = dummy;
+        inode_arr[200] = dummy;
 
         int endOfMeta = 76288;
         lseek(pFD, 0, SEEK_SET); // Seek to 0
@@ -239,7 +243,7 @@ int bv_init(const char *fs_fileName) {
 
         // Seek to end of first superblock
         lseek(pFD, INODE_START, SEEK_SET);
-        write(pFD, (void*)(&arr), sizeof(arr));
+        write(pFD, (void*)(&inode_arr), sizeof(inode_arr));
 
         // Go to start of linked list and piece it together
         lseek(pFD, 76288, SEEK_SET);
@@ -288,7 +292,7 @@ int bv_destroy() {
   if(INIT_FLAG == 1){
     // File has been initialized.
     lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
-    write(GLOBAL_PFD, (void*)(&arr), sizeof(arr));
+    write(GLOBAL_PFD, (void*)(&inode_arr), sizeof(inode_arr));
     close(GLOBAL_PFD);
   }
   else{
@@ -470,9 +474,14 @@ int bv_unlink(const char* fileName) {
 void bv_ls() {
   int numfiles = 0;
   for(int i = 0; i<256; i++){
-    if(arr[i].size){
+    if(inode_arr[i].size!=0){
       numfiles++;
     }
   }
-  printf("%d files\n", numfiles);
+  printf("| %d files\n", numfiles);
+  for(int i = 0; i<256; i++){
+    if(inode_arr[i].size!=0){
+      printf("| bytes: %d, blocks %d, %d, %s\n", inode_arr[i].size, inode_arr[i].size/512, inode_arr[i].time, inode_arr[i].fileName);
+    }
+  }
 }
