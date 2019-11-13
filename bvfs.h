@@ -161,10 +161,6 @@ int bv_init(const char *fs_fileName) {
         write(pFD, (void*)&nbyte, 1);
         printf("Created File and wrote zero at the end.\n");
 
-        // create in memory data structures
-        // read in structures
-        // superblock, inode 
-
         // 512 bytes for "super block" pointer in beginning
         // 75,776 bytes for inodes
         // 76,288 bytes for meta data
@@ -183,17 +179,10 @@ int bv_init(const char *fs_fileName) {
            256th pointer points to the next super block in the data region.
          */
 
-        // Get block num and write it to file
-        struct iNode test = {"hello\n", 1, 1, 0, 0};
-        printf("%ld\n", sizeof(test));
-        inode_arr[0] = test;
-        struct iNode dummy = {"hello dummy\n", 1, 1, 0, 0};
-        inode_arr[200] = dummy;
-
         lseek(pFD, 0, SEEK_SET); // Seek to 0
         write(pFD, (void*)(&ENDOFMETA), 4); // Write the start of the super block linked list
 
-        // Seek to end of first superblock
+        // Seek to beginning of iNodes (end of superblock)
         lseek(pFD, INODE_START, SEEK_SET);
         write(pFD, (void*)(&inode_arr), sizeof(inode_arr));
 
@@ -208,11 +197,9 @@ int bv_init(const char *fs_fileName) {
                 else
                     write(pFD, "\0\0", 2);
             }
-            //printf("block num : %d\n",blockNum);
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
         }
-        // Need to add further super blocks to for loop
 
         close(pFD);
         return 0;
