@@ -65,7 +65,7 @@ int GLOBAL_PFD;
 int INIT_FLAG = 0;
 short superblock_array[256];
 struct iNode inode_arr[256];
-const int ENDOFMETA = sizeof(superblock_array)+512;
+const int ENDOFMETA = sizeof(inode_arr)+512;
 
 /*
  * int bv_init(const char *fs_fileName);
@@ -106,11 +106,18 @@ int bv_init(const char *fs_fileName) {
             int sblock_start;
             read(pFD, &sblock_start, 4);
             printf("Read super block pos: %d\n",sblock_start);
+            
+            lseek(pFD, 257*BLOCK_SIZE, SEEK_SET);
+            short test = 0;
+            for(int i = 0; i<256; i++){
+              read(pFD, &test, 2);
+              printf("%d\n", test);
+            }
 
             // Initialize superblock array looking at first superblock
             // Should get the first superblock that contains at least one usable offset
-            short temp = 0;
             int ctr = 0;
+            short temp = 0;
             short sarr[256];
             while(temp == 0){
               lseek(pFD, sblock_start, SEEK_SET);
@@ -195,6 +202,7 @@ int bv_init(const char *fs_fileName) {
         lseek(pFD, ENDOFMETA, SEEK_SET);
         // Write addresses to next 256 blocks
         short blockNum = (ENDOFMETA/BLOCK_SIZE);
+        printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
               if(i*BLOCK_SIZE<PARTITION_SIZE-1)
@@ -202,7 +210,7 @@ int bv_init(const char *fs_fileName) {
               else
                 write(pFD, "\0\0", 2);
             }
-            //printf("block num : %d\n",blockNum);
+            printf("block num : %d\n",blockNum);
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
         }
