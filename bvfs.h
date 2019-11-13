@@ -43,6 +43,14 @@ int bv_read(int bvfs_FD, void *buf, size_t count);
 int bv_unlink(const char* fileName);
 void bv_ls();
 
+// max of 256 iNodes
+struct iNode{
+    char fileName[32]; // 32 bytes
+    int size; // 4 bytes
+    int time; // 4 bytes
+    short address[128]; // 256 bytes
+};
+
 // Global variables
 const int BLOCK_SIZE = 512;
 const int PARTITION_SIZE = 8388608;
@@ -52,14 +60,11 @@ const int MAX_FILE_BLOCKS = 128;
 const int MAX_FILES = 256;
 const int MAX_FILE_NAME = 32;
 const int INODE_START = 512;
+int GLOBAL_PFD;
+int INIT_FLAG = 0;
+short superblock_array[256];
+struct iNode arr[256];
 
-// max of 256 iNodes
-struct iNode{
-    char fileName[32]; // 32 bytes
-    int size; // 4 bytes
-    int time; // 4 bytes
-    short address[128]; // 256 bytes
-};
 /*
  * int bv_init(const char *fs_fileName);
  *
@@ -86,110 +91,13 @@ struct iNode{
 int bv_init(const char *fs_fileName) {
   // try to open file
   int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
-  if (pFD < 0) {
-    if (errno == EEXIST) {
-      // file already exists
-      printf("File already exists.\n");
-      pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
-      
-      // open in memory data structures
-      // read in structures
-      // superblock, inodes
-
-      lseek(pFD, 0, SEEK_SET);
-      int SBS;
-      read(pFD, &SBS, 4);
-      printf("Read and going to seek to pos: %d\n",SBS);
-
-      // Seek to end of metadata and read the block pointers
-      lseek(pFD, SBS, SEEK_SET);
-      short blockID = SBS/BLOCK_SIZE;
-      for (short i = blockID; i<(blockID+256); i++) {
-        short temp;
-        read(pFD, &temp, 2);
-        printf("Point to block #: %d\n",temp);
-      }
-
-      lseek(pFD, INODE_START, SEEK_SET);
-      struct iNode arr_read[256];
-      read(pFD, &arr_read, sizeof(arr_read));
-      printf("%s\n", arr_read[0].fileName);
-      printf("%s\n", arr_read[200].fileName);
-
-      close(pFD);
-      return 0;
-    }
-    else {
-      // Something bad must have happened... check errno?
-      printf("%s\n", strerror(errno));
-      return -1;
-    }
-
-  } else {
-    // File did not previously exist but it does now. Write data to it
-    char nbyte = '\0';
-    // seek to position of max parition size - 1 and then write 0 to signify end of file
-    lseek(pFD, PARTITION_SIZE-1, SEEK_SET);
-    write(pFD, (void*)&nbyte, 1);
-    printf("Created File and wrote zero at the end.\n");
-    
-    // create in memory data structures
-    // read in structures
-    // superblock, inode 
-
-    // 512 bytes for "super block" pointer in beginning
-    // 75,776 bytes for inodes
-    // 76,288 bytes for meta data
-
-    // 8,388,608 bytes total
-    // minus 76,288 meta data bytes
-    // leaves 8,312,320 bytes for data region
-    /*
-       8,312,320 divided by 512 is 16,235 blocks that need managed.
-       To point to these blocks is going to require 16,235 * 2 bytes (shorts) = 32,470 bytes
-       32,470 divided by 512 is ~64 blocks pointing to data blocks
-    */
-    /*
-       Position to "super block" points to = 76,288th byte.
-       This super block can point to the next 255 blocks.
-       256th pointer points to the next super block in the data region.
-    */
-
-    // iNode array to represent all files
-    struct iNode arr[256];
-    struct iNode test = {"hello\n", 0, 0, 0};
-    arr[0] = test;
-    struct iNode dummy = {"hello dummy\n", 0, 0, 0};
-    arr[200] = dummy;
-
-    // Get block num and write it to file
-    int endOfMeta = 76288;
-    lseek(pFD, 0, SEEK_SET); // Seek to 0
-    write(pFD, (void*)(&endOfMeta), 4); // Write the start of the super block linked list
-
-    // Seek to end of first superblock
-    lseek(pFD, INODE_START, SEEK_SET);
-    write(pFD, (void*)(&arr), sizeof(arr));
-
-    // Go to start of linked list and piece it together
-    lseek(pFD, 76288, SEEK_SET);
-    // Write addresses to next 256 blocks
-    short blockNum = (76288/BLOCK_SIZE)+1; 
-    for (short i = blockNum; i<(blockNum+256);i++)
-        write(pFD, (void*)&i, 2);
-    // Need to add further super blocks to for loop
-
-    close(pFD);
-    return 0;
-  }
-=======
-    // try to open file
-    int pFD = open(fs_fileName, O_CREAT | O_RDWR | O_EXCL, 0644);
     if (pFD < 0) {
         if (errno == EEXIST) {
             // file already exists
             printf("File already exists.\n");
             pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
+            GLOBAL_PFD = pFD;
+            INIT_FLAG = 1;
 
             // open in memory data structures
             // read in structures
@@ -235,6 +143,48 @@ int bv_init(const char *fs_fileName) {
                 ctr++;
                 printf("Point to block #: %d\n",temp);
             }
+            lseek(pFD, INODE_START, SEEK_SET);
+            struct iNode arr_read[256];
+            read(pFD, &arr_read, sizeof(arr_read));
+            printf("%s\n", arr_read[0].fileName);
+            printf("%s\n", arr_read[200].fileName);
+
+            lseek(pFD, 16277 * BLOCK_SIZE, SEEK_SET);
+            printf("%d\n", 16277*BLOCK_SIZE);
+            ctr = 0;
+            for (short i = blockID; i<(blockID+256); i++) {
+                short temp;
+                read(pFD, &temp, 2);
+                printf("Point to block #: %d\n",temp);
+            }
+
+
+            // Initialize superblock array looking at first superblock
+            // Should get the first superblock that contains at least one usable offset
+            int sblock_start = 76288;
+            printf("sblock start %d\n", sblock_start);
+            short temp = 0;
+            ctr = 0;
+            while(temp == 0){
+              lseek(pFD, sblock_start, SEEK_SET);
+                for (short i = 0; i < 256; i++){
+                    read(pFD, &temp, 2);
+                    arr[ctr] = temp;
+                    ctr++;
+                    if(temp != 0)
+                      break;
+                }
+              if(temp == 0)
+                sblock_start = arr[255] * BLOCK_SIZE;
+            }
+
+            printf("stblock start %d\n", sblock_start);
+            lseek(pFD, sblock_start, SEEK_SET);
+            for(short i = 0; i < 256; i++){
+              read(pFD, &temp, 2);
+              superblock_array[i] = temp;
+              printf("%d\n", superblock_array[i]);
+            }
 
             close(pFD);
             return 0;
@@ -247,6 +197,8 @@ int bv_init(const char *fs_fileName) {
 
     } else {
         // File did not previously exist but it does now. Write data to it
+        GLOBAL_PFD = pFD;
+        INIT_FLAG = 1;
         char nbyte = '\0';
         // seek to position of max parition size - 1 and then write 0 to signify end of file
         lseek(pFD, PARTITION_SIZE-1, SEEK_SET);
@@ -276,9 +228,18 @@ int bv_init(const char *fs_fileName) {
          */
 
         // Get block num and write it to file
+        struct iNode test = {"hello\n", 1, 1, 0};
+        arr[0] = test;
+        struct iNode dummy = {"hello dummy\n", 0, 0, 0};
+        arr[200] = dummy;
+
         int endOfMeta = 76288;
         lseek(pFD, 0, SEEK_SET); // Seek to 0
         write(pFD, (void*)(&endOfMeta), 4); // Write the start of the super block linked list
+
+        // Seek to end of first superblock
+        lseek(pFD, INODE_START, SEEK_SET);
+        write(pFD, (void*)(&arr), sizeof(arr));
 
         // Go to start of linked list and piece it together
         lseek(pFD, 76288, SEEK_SET);
@@ -286,18 +247,22 @@ int bv_init(const char *fs_fileName) {
         short blockNum = (76288/BLOCK_SIZE);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
+              if(i*BLOCK_SIZE<PARTITION_SIZE-1){
                 write(pFD, (void*)&i, 2);
+              }
+              else{
+                write(pFD, "\0\0", 2);
+              }
             }
+            printf("block num : %d\n",blockNum);
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
-            printf("block num : %d\n",blockNum);
         }
         // Need to add further super blocks to for loop
 
         close(pFD);
         return 0;
     }
->>>>>>> 8ed6247c6ea62c15dc0f5e46976c82345e61c6e3
 }
 
 
@@ -319,6 +284,19 @@ int bv_init(const char *fs_fileName) {
  *           returning.
  */
 int bv_destroy() {
+  // Write the iNode array back to file to save changes
+  if(INIT_FLAG == 1){
+    // File has been initialized.
+    lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
+    write(GLOBAL_PFD, (void*)(&arr), sizeof(arr));
+    close(GLOBAL_PFD);
+  }
+  else{
+    // File has not been initialized.
+    char s[] = "File cleanup unsuccesful.\0";
+    write(2, (void*)(s), sizeof(s));
+    return -1;
+  }
 }
 
 
@@ -490,4 +468,11 @@ int bv_unlink(const char* fileName) {
  *   void
  */
 void bv_ls() {
+  int numfiles = 0;
+  for(int i = 0; i<256; i++){
+    if(arr[i].size){
+      numfiles++;
+    }
+  }
+  printf("%d files\n", numfiles);
 }
