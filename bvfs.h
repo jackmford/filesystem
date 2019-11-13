@@ -104,78 +104,27 @@ int bv_init(const char *fs_fileName) {
             // superblock, inodes
 
             lseek(pFD, 0, SEEK_SET);
-            int SBS;
-            read(pFD, &SBS, 4);
-            printf("Read and going to seek to pos: %d\n",SBS);
-
-            // Seek to end of metadata and read the block pointers
-            lseek(pFD, SBS, SEEK_SET);
-            short blockID = SBS/BLOCK_SIZE;
-            short arr[256];
-            short ctr = 0;
-            for (short i = blockID; i<(blockID+256); i++) {
-                short temp;
-                read(pFD, &temp, 2);
-                arr[ctr] = temp;
-                ctr++;
-                printf("Point to block #: %d\n",temp);
-            }
-
-            printf("Switching\n");
-
-            lseek(pFD, arr[255] * BLOCK_SIZE, SEEK_SET);
-            ctr = 0;
-            for (short i = blockID; i<(blockID+256); i++) {
-                short temp;
-                read(pFD, &temp, 2);
-                arr[ctr] = temp;
-                ctr++;
-                printf("Point to block #: %d\n",temp);
-            }
-            printf("Switching\n");
-
-            lseek(pFD, arr[255] * BLOCK_SIZE, SEEK_SET);
-            ctr = 0;
-            for (short i = blockID; i<(blockID+256); i++) {
-                short temp;
-                read(pFD, &temp, 2);
-                arr[ctr] = temp;
-                ctr++;
-                printf("Point to block #: %d\n",temp);
-            }
-            lseek(pFD, INODE_START, SEEK_SET);
-            struct iNode arr_read[256];
-            read(pFD, &arr_read, sizeof(arr_read));
-            printf("%s\n", arr_read[0].fileName);
-            printf("%s\n", arr_read[200].fileName);
-
-            lseek(pFD, 16277 * BLOCK_SIZE, SEEK_SET);
-            printf("%d\n", 16277*BLOCK_SIZE);
-            ctr = 0;
-            for (short i = blockID; i<(blockID+256); i++) {
-                short temp;
-                read(pFD, &temp, 2);
-                printf("Point to block #: %d\n",temp);
-            }
-
+            int sblock_start;
+            read(pFD, &sblock_start, 4);
+            printf("Read super block pos: %d\n",sblock_start);
 
             // Initialize superblock array looking at first superblock
             // Should get the first superblock that contains at least one usable offset
-            int sblock_start = 76288;
             printf("sblock start %d\n", sblock_start);
             short temp = 0;
-            ctr = 0;
+            int ctr = 0;
+            short sarr[256];
             while(temp == 0){
               lseek(pFD, sblock_start, SEEK_SET);
                 for (short i = 0; i < 256; i++){
                     read(pFD, &temp, 2);
-                    arr[ctr] = temp;
+                    sarr[ctr] = temp;
                     ctr++;
-                    if(temp != 0)
+                    if(temp != 0) // Asserts one usable offset
                       break;
                 }
               if(temp == 0)
-                sblock_start = arr[255] * BLOCK_SIZE;
+                sblock_start = sarr[255] * BLOCK_SIZE;
             }
 
             printf("stblock start %d\n", sblock_start);
@@ -183,7 +132,6 @@ int bv_init(const char *fs_fileName) {
             for(short i = 0; i < 256; i++){
               read(pFD, &temp, 2);
               superblock_array[i] = temp;
-              printf("%d\n", superblock_array[i]);
             }
 
             close(pFD);
@@ -230,7 +178,7 @@ int bv_init(const char *fs_fileName) {
         // Get block num and write it to file
         struct iNode test = {"hello\n", 1, 1, 0};
         arr[0] = test;
-        struct iNode dummy = {"hello dummy\n", 0, 0, 0};
+        struct iNode dummy = {"hello dummy\n", 1, 1, 0};
         arr[200] = dummy;
 
         int endOfMeta = 76288;
@@ -247,14 +195,12 @@ int bv_init(const char *fs_fileName) {
         short blockNum = (76288/BLOCK_SIZE);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
-              if(i*BLOCK_SIZE<PARTITION_SIZE-1){
+              if(i*BLOCK_SIZE<PARTITION_SIZE-1)
                 write(pFD, (void*)&i, 2);
-              }
-              else{
+              else
                 write(pFD, "\0\0", 2);
-              }
             }
-            printf("block num : %d\n",blockNum);
+            //printf("block num : %d\n",blockNum);
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
         }
