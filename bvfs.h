@@ -104,12 +104,13 @@ int bv_init(const char *fs_fileName) {
       // superblock, inodes
 
       lseek(pFD, 0, SEEK_SET);
-      short SBS;
-      read(pFD, &SBS, 2);
+      int SBS;
+      read(pFD, &SBS, 4);
       printf("Read and going to seek to pos: %d\n",SBS);
 
-      lseek(pFD, SBS*512, SEEK_SET);
-      for (short i = SBS; i<SBS+256; i++) {
+      lseek(pFD, SBS, SEEK_SET);
+      short blockID = SBS/BLOCK_SIZE;
+      for (short i = blockID; i<(blockID+256); i++) {
         short temp;
         read(pFD, &temp, 2);
         printf("Point to block #: %d\n",temp);
@@ -138,7 +139,7 @@ int bv_init(const char *fs_fileName) {
 
     // 512 bytes for "super block" pointer in beginning
     // 75,776 bytes for inodes
-    // 76,288 bytes for meta data UNRECOVERABLE
+    // 76,288 bytes for meta data
 
     // 8,388,608 bytes total
     // minus 76,288 meta data bytes
@@ -155,18 +156,16 @@ int bv_init(const char *fs_fileName) {
     */
 
     // Get block num and write it to file
-    short tmpNum = 76288/BLOCK_SIZE;
+    int endOfMeta = 76288;
     lseek(pFD, 0, SEEK_SET); // Seek to 0
-    write(pFD, (void*)(&tmpNum), 2); 
+    write(pFD, (void*)(&endOfMeta), 4); // Write the start of the super block linked list
 
-    // Seek to 76,288
+    // Go to start of linked list and piece it together
     lseek(pFD, 76288, SEEK_SET);
-    short offset = 1;
-    // Write addresses to next 255 blocks
-    for (short i = (76288/BLOCK_SIZE); i<((76288/BLOCK_SIZE)+256);i++){
+    // Write addresses to next 256 blocks
+    short blockNum = (76288/BLOCK_SIZE)+1; 
+    for (short i = blockNum; i<(blockNum+256);i++)
         write(pFD, (void*)&i, 2);
-        offset++;
-    }
 
     close(pFD);
     return 0;
