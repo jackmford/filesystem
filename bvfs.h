@@ -108,6 +108,7 @@ int bv_init(const char *fs_fileName) {
       read(pFD, &SBS, 4);
       printf("Read and going to seek to pos: %d\n",SBS);
 
+      // Seek to end of metadata and read the block pointers
       lseek(pFD, SBS, SEEK_SET);
       short blockID = SBS/BLOCK_SIZE;
       for (short i = blockID; i<(blockID+256); i++) {
@@ -166,6 +167,7 @@ int bv_init(const char *fs_fileName) {
     short blockNum = (76288/BLOCK_SIZE)+1; 
     for (short i = blockNum; i<(blockNum+256);i++)
         write(pFD, (void*)&i, 2);
+    // Need to add further super blocks to for loop
 
     close(pFD);
     return 0;
