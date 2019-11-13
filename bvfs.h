@@ -52,7 +52,21 @@ const int MAX_FILE_BLOCKS = 128;
 const int MAX_FILES = 256;
 const int MAX_FILE_NAME = 32;
 
+// 16384
+// super blocks should also keep track of inodes
+struct superBlockNode {
+  short address; // 2 bytes
+  short availability; // 2 bytes
+//  struct superBlockNode *next; // 4 bytes
+};
 
+// max of 256 inodes
+struct iNode{
+  char* fileName; // 32 bytes
+  int size; // 4 bytes
+  int time; // 4 bytes
+  short address[128]; // 256 bytes
+};
 /*
  * int bv_init(const char *fs_fileName);
  *
@@ -86,6 +100,22 @@ int bv_init(const char *fs_fileName) {
       pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
       
       // open in memory data structures
+      // read in structures
+      // superblock, inode 
+      
+      //printf("%ld\n", sizeof(test_inodes));
+      struct superBlockNode arr_superblock[16384];
+      printf("%ld\n", sizeof(arr_superblock));
+      
+
+//      read(pFD, &arr_superblock, sizeof(arr_superblock));
+
+      lseek(pFD, 0, SEEK_SET);
+      lseek(pFD, sizeof(arr_superblock), SEEK_SET);
+      struct iNode tnodes[256];
+      printf("%ld\n", sizeof(tnodes));
+      read(pFD, &tnodes, sizeof(tnodes));
+      printf("%s\n", tnodes[0].fileName);
 
       return 0;
     }
@@ -97,13 +127,36 @@ int bv_init(const char *fs_fileName) {
 
   } else {
     // File did not previously exist but it does now. Write data to it
-    int num = 0;
+    char nbyte = '\0';
     // seek to position and then write 0 to signify end of file
-    lseek(pFD, PARTITION_SIZE-1, SEEK_CUR);
-    write(pFD, (void*)&num, 1);
+    lseek(pFD, PARTITION_SIZE-1, SEEK_SET);
+    write(pFD, (void*)&nbyte, 1);
     printf("Created File and wrote zero at the end.\n");
     
-    // open in memory data structures
+    // create in memory data structures
+    // read in structures
+    // superblock, inode 
+    // 131072 for superblock
+    // 75776 for inodes
+    // 206848 bytes for metadata
+
+    lseek(pFD, 0, SEEK_SET);
+
+    struct iNode arr_inodes[256];
+    struct iNode t = {"asdf\0", 0, 0, 0};
+    arr_inodes[0] = t;
+    struct superBlockNode arr_superblock[16384];
+    struct superBlockNode te;
+    write(pFD, (void*)&arr_superblock, sizeof(arr_superblock));
+    printf("%ld\n", sizeof(arr_inodes));
+    write(pFD, (void*)&arr_inodes, sizeof(arr_inodes));
+    struct iNode d;
+    printf("%ld\n", sizeof(arr_superblock));
+    lseek(pFD, sizeof(arr_superblock), SEEK_SET);
+    struct iNode test_inodes[256];
+    read(pFD, &test_inodes, sizeof(test_inodes));
+    printf("%s\n", test_inodes[0].fileName);
+    close(pFD);
     return 0;
   }
 }
