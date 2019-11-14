@@ -63,6 +63,7 @@ const int MAX_FILE_NAME = 32;
 const int INODE_START = 512;
 int GLOBAL_PFD;
 int INIT_FLAG = 0;
+int SBLOCK_ARRAY_ID;
 short superblock_array[256];
 struct iNode inode_arr[256];
 const int ENDOFMETA = sizeof(inode_arr)+512;
@@ -136,7 +137,9 @@ int bv_init(const char *fs_fileName) {
                 read(pFD, &temp, 2);
                 superblock_array[i] = temp;
             }
-            //printf("Current superblock at %d.\n", sblock_start);
+
+            printf("Current superblock at %d.\n", sblock_start);
+            SBLOCK_ARRAY_ID = sblock_start;
 
             // Read in inode array from file.
             lseek(pFD, INODE_START, SEEK_SET);
@@ -179,6 +182,13 @@ int bv_init(const char *fs_fileName) {
            256th pointer points to the next super block in the data region.
          */
 
+        // Get block num and write it to file
+        struct iNode test = {"hello\0", 1, 1, 1, 0};
+        printf("%ld\n", sizeof(test));
+        inode_arr[0] = test;
+        struct iNode dummy = {"hello dummy\0", 1, 1, 1, 0};
+        inode_arr[200] = dummy;
+
         lseek(pFD, 0, SEEK_SET); // Seek to 0
         write(pFD, (void*)(&ENDOFMETA), 4); // Write the start of the super block linked list
 
@@ -190,7 +200,9 @@ int bv_init(const char *fs_fileName) {
         lseek(pFD, ENDOFMETA, SEEK_SET);
         // Write addresses to next 256 blocks
         short blockNum = (ENDOFMETA/BLOCK_SIZE);
-        //printf("%d\n", blockNum);
+
+        SBLOCK_ARRAY_ID = blockNum;
+        printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
                 if(i*BLOCK_SIZE<PARTITION_SIZE-1)
@@ -290,6 +302,32 @@ int bv_open(const char *fileName, int mode) {
         }
     }
 
+  printf("%ld", strlen(fileName));
+  int name_length = sizeof(fileName);
+  printf("%d\n", name_length);
+  if(fileName[strlen(fileName)] != '\0'){
+    char err[] = "FileName not nullbyte ended.\n";
+    write(2, &err, sizeof(err));
+    return -1;
+  }
+  else if(strlen(fileName)>32){
+    char err[] = "FileName too long.\n";
+    write(2, &err, sizeof(err));
+    return -1;
+  }
+
+  // See if the file exists
+  int found_flag = 0;
+  for(int i = 0; i<256; i++){
+    if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
+      found_flag = 1;
+    }
+  }
+  if(found_flag == 0 && mode == 0){
+    char err[] = "Opened in read mode but no file found.\n";
+    write(2, &err, sizeof(err));
+    return -1;
+  }
 }
 
 
