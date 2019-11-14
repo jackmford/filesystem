@@ -107,7 +107,7 @@ int bv_init(const char *fs_fileName) {
             read(pFD, &sblock_start, 4);
             printf("Read super block pos: %d\n",sblock_start);
             
-            lseek(pFD, 257*BLOCK_SIZE, SEEK_SET);
+            lseek(pFD, 16129*BLOCK_SIZE, SEEK_SET);
             short test = 0;
             for(int i = 0; i<256; i++){
               read(pFD, &test, 2);
@@ -205,7 +205,7 @@ int bv_init(const char *fs_fileName) {
         printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
-              if(i*BLOCK_SIZE<PARTITION_SIZE-1)
+              if(i*BLOCK_SIZE<=PARTITION_SIZE)
                 write(pFD, (void*)&i, 2);
               else
                 write(pFD, "\0\0", 2);
