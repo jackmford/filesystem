@@ -111,6 +111,7 @@ int bv_init(const char *fs_fileName) {
             // contains at least one usable data block
             short temp = 0;
             int ctr = 0;
+            short temp = 0;
             short sarr[256];
 
             // If super block contains all null addresses, 
@@ -190,6 +191,7 @@ int bv_init(const char *fs_fileName) {
         lseek(pFD, ENDOFMETA, SEEK_SET);
         // Write addresses to next 256 blocks
         short blockNum = (ENDOFMETA/BLOCK_SIZE);
+        printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
                 if(i*BLOCK_SIZE<PARTITION_SIZE-1)
