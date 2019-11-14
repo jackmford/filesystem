@@ -111,7 +111,6 @@ int bv_init(const char *fs_fileName) {
             // contains at least one usable data block
             short temp = 0;
             int ctr = 0;
-            short temp = 0;
             short sarr[256];
 
             // If super block contains all null addresses, 
@@ -137,7 +136,7 @@ int bv_init(const char *fs_fileName) {
                 read(pFD, &temp, 2);
                 superblock_array[i] = temp;
             }
-            printf("Current superblock at %d.\n", sblock_start);
+            //printf("Current superblock at %d.\n", sblock_start);
 
             // Read in inode array from file.
             lseek(pFD, INODE_START, SEEK_SET);
@@ -191,7 +190,7 @@ int bv_init(const char *fs_fileName) {
         lseek(pFD, ENDOFMETA, SEEK_SET);
         // Write addresses to next 256 blocks
         short blockNum = (ENDOFMETA/BLOCK_SIZE);
-        printf("%d\n", blockNum);
+        //printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
                 if(i*BLOCK_SIZE<PARTITION_SIZE-1)
