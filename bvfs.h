@@ -47,9 +47,9 @@ void bv_ls();
 struct iNode{
     char fileName[32]; // 32 bytes
     int size; // 4 bytes
-    int time; // 4 bytes
+    int time = 0; // 4 bytes
     short address[128]; // 256 bytes
-    char dummydata[216];
+    int dummydata[54];
 };
 
 // Global variables
@@ -275,6 +275,21 @@ int BV_WTRUNC = 2;
  *           stderr prior to returning.
  */
 int bv_open(const char *fileName, int mode) {
+    // Contact superblock arr to get address for new file
+        // Store this address in address of inode at 0
+    for (int i = 0; i < MAX_FILES; i++) {
+        // Find open iNode
+        if (inode_arr[i].time == 0) {
+            // on find:
+                // update name, time, mode
+            printf("about to write size: %d with file name %s\n",strlen(fileName), fileName);
+            memcpy(&(inode_arr[i].fileName), fileName, strlen(fileName));
+            
+            memcpy(&(inode_arr[i].
+            break;
+        }
+    }
+
 }
 
 
