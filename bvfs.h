@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 
 // Prototypes
 int bv_init(const char *fs_fileName);
@@ -49,7 +50,7 @@ struct iNode{
     int size; // 4 bytes
     int time = 0; // 4 bytes
     short address[128]; // 256 bytes
-    int dummydata[54];
+    int dummydata[51];
 };
 
 // Global variables
@@ -183,10 +184,15 @@ int bv_init(const char *fs_fileName) {
          */
 
         // Get block num and write it to file
-        struct iNode test = {"hello\0", 1, 1, 1, 0};
+        time_t rawtime;
+        struct tm * timeinfo;
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        struct iNode test = {"hello\0", 1, timeinfo, 1, 0};
         printf("%ld\n", sizeof(test));
         inode_arr[0] = test;
-        struct iNode dummy = {"hello dummy\0", 1, 1, 1, 0};
+        struct iNode dummy = {"hello dummy\0", 1, timeinfo, 1, 0};
         inode_arr[200] = dummy;
 
         lseek(pFD, 0, SEEK_SET); // Seek to 0
@@ -205,10 +211,10 @@ int bv_init(const char *fs_fileName) {
         printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
-                if(i*BLOCK_SIZE<PARTITION_SIZE-1)
+                if(i*BLOCK_SIZE<=PARTITION_SIZE)
                     write(pFD, (void*)&i, 2);
                 else
-                    write(pFD, "\0\0", 2);
+                    write(pFD, 0, 2);
             }
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
@@ -288,46 +294,92 @@ int BV_WTRUNC = 2;
  */
 int bv_open(const char *fileName, int mode) {
     // Contact superblock arr to get address for new file
-        // Store this address in address of inode at 0
+    // Store this address in address of inode at 0
     for (int i = 0; i < MAX_FILES; i++) {
         // Find open iNode
         if (inode_arr[i].time == 0) {
             // on find:
-                // update name, time, mode
+            // update name, time, mode
             printf("about to write size: %d with file name %s\n",strlen(fileName), fileName);
             memcpy(&(inode_arr[i].fileName), fileName, strlen(fileName));
-            
-            memcpy(&(inode_arr[i].
+
+            //memcpy(&(inode_arr[i].
             break;
         }
     }
 
-  printf("%ld", strlen(fileName));
-  int name_length = sizeof(fileName);
-  printf("%d\n", name_length);
-  if(fileName[strlen(fileName)] != '\0'){
-    char err[] = "FileName not nullbyte ended.\n";
-    write(2, &err, sizeof(err));
-    return -1;
-  }
-  else if(strlen(fileName)>32){
-    char err[] = "FileName too long.\n";
-    write(2, &err, sizeof(err));
-    return -1;
-  }
-
-  // See if the file exists
-  int found_flag = 0;
-  for(int i = 0; i<256; i++){
-    if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
-      found_flag = 1;
+    printf("%ld", strlen(fileName));
+    int name_length = sizeof(fileName);
+    printf("%d\n", name_length);
+    if(fileName[strlen(fileName)] != '\0'){
+        char err[] = "FileName not nullbyte ended.\n";
+        write(2, &err, sizeof(err));
+        return -1;
     }
-  }
-  if(found_flag == 0 && mode == 0){
-    char err[] = "Opened in read mode but no file found.\n";
-    write(2, &err, sizeof(err));
-    return -1;
-  }
+    else if(strlen(fileName)>32){
+        char err[] = "FileName too long.\n";
+        write(2, &err, sizeof(err));
+        return -1;
+    }
+    // See if the file exists, found_flag will be 1 if it does
+    int found_flag = 0;
+    int file_index = -1;
+    for(int i = 0; i<256; i++){
+        if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
+            found_flag = 1;
+            file_index = i;
+        }
+    }
+    // File does not exist
+    // Read
+    if(found_flag == 0 && mode == 0){
+        char err[] = "Opened in read mode but no file found.\n";
+        write(2, &err, sizeof(err));
+        return -1;
+    }
+    // Write
+    int free_inode_index = -1;
+    if(found_flag == 1 && mode == 1){
+        for(int i = 0; i<MAX_FILES; i++){
+            if(inode_arr[i].timeinfo == 0){
+                free_inode_index = i;
+            }
+        }
+    }
+    for(int j=0; j<sizeof(superblock_array); j++){
+        // Found address in superblock
+        if(superblock_array[j] != 0){
+            time_t rawtime;
+            struct tm * timeinfo;
+            time(&rawtime);
+            timeinfo = localtime(&rawtime);
+            char name[32];
+            struct iNode tmp;
+            for(int i = 0; i<strlen(fileName); i++){
+                tmp.fileName[i] = fileName[i];
+                fileName++;
+            }
+            //struct iNode tmp = {name, 0, timeinfo, 0, superblock_array[j], 0};
+            inode_arr[free_inode_index] = tmp;
+            superblock_array[j] = 0;
+        }
+        //get new superblock if empty
+    }
+    // Write
+    //
+    //
+    // File Exists
+    // Read
+    // Write Concat
+    // Write Truncate
+    if(found_flag == 0 && mode == 2){
+        for(int i = 1; i<MAX_FILE_BLOCKS; i++){
+            inode_arr[file_index].address[i] = 0;
+        }
+
+        return inode_arr[file_index].address[0];
+    }
+
 }
 
 
@@ -466,14 +518,13 @@ void bv_ls() {
     // Iterate through iNode array to retrieve information.
     int numfiles = 0;
     for(int i = 0; i<256; i++){
-        if(inode_arr[i].size!=0){
+        if(inode_arr[i].timeinfo!=0){
             numfiles++;
         }
     }
     printf("| %d files\n", numfiles);
     for(int i = 0; i<256; i++){
-        if(inode_arr[i].size!=0){
-            printf("| bytes: %d blocks %d, %d, %s\n", inode_arr[i].size, inode_arr[i].size/512, inode_arr[i].time, inode_arr[i].fileName);
+        if(inode_arr[i].timeinfo!=0){
+            printf("| bytes: %d blocks %d, %s, %s\n", inode_arr[i].size, inode_arr[i].size/512, asctime(inode_arr[i].timeinfo), inode_arr[i].fileName);
         }
     }
-}
