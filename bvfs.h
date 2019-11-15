@@ -48,7 +48,7 @@ void bv_ls();
 struct iNode{
     char fileName[32]; // 32 bytes
     int size; // 4 bytes
-    struct tm * timeinfo; // 8 bytes
+    time_t timeinfo; // 8 bytes
     short address[128]; // 256 bytes
     int dummydata[51];
 };
@@ -189,14 +189,18 @@ int bv_init(const char *fs_fileName) {
 
         // Get block num and write it to file
         time_t rawtime;
-        struct tm * timeinfo;
-        time(&rawtime);
-        timeinfo = localtime(&rawtime);
+        rawtime = time(NULL);
 
-        struct iNode test = {"hello\0", 1, timeinfo, 1, 0};
+
+        struct iNode test = {"hello\0", 1, rawtime, 1, 0};
         printf("%ld\n", sizeof(test));
+        printf("%ld\n", sizeof(test.timeinfo));
+        printf("%ld\n", sizeof(test.fileName));
+        printf("%ld\n", sizeof(test.size));
+        printf("%ld\n", sizeof(test.dummydata));
+        printf("%ld\n", sizeof(test.address));
         inode_arr[0] = test;
-        struct iNode dummy = {"hello dummy\0", 1, timeinfo, 1, 0};
+        struct iNode dummy = {"hello dummy\0", 1, rawtime, 1, 0};
         inode_arr[200] = dummy;
 
         lseek(pFD, 0, SEEK_SET); // Seek to 0
@@ -367,7 +371,7 @@ int bv_open(const char *fileName, int mode) {
   // Write Truncate
   if(found_flag == 0 && mode == 2){
     for(int i = 1; i<MAX_FILE_BLOCKS; i++){
-      inode_arr[file_index].address[i] = 0;
+//      inode_arr[file_index].address[i] = 0;
     }
 
     return inode_arr[file_index].address[0];
@@ -518,7 +522,9 @@ void bv_ls() {
   printf("| %d files\n", numfiles);
   for(int i = 0; i<256; i++){
     if(inode_arr[i].timeinfo!=0){
-      printf("| bytes: %d blocks %d, %s, %s\n", inode_arr[i].size, inode_arr[i].size/512, asctime(inode_arr[i].timeinfo), inode_arr[i].fileName);
+//      printf("%s\n", ctime(&inode_arr[i].timeinfo));
+      
+      printf("| bytes: %d blocks %d, %s, %s", inode_arr[i].size, inode_arr[i].size/512, inode_arr[i].fileName, ctime(&inode_arr[i].timeinfo));
     }
   }
 }
