@@ -69,6 +69,47 @@ short superblock_array[256];
 struct iNode inode_arr[256];
 const int ENDOFMETA = sizeof(inode_arr)+512;
 
+
+short get_new_address() {
+    // Try to find an open block address
+    // to hand back
+    short return_addr = 0;
+    short i = 0;
+    while (return_addr == 0) {
+        // If i is 255, we have not found a new address
+        // Call function to find new block of addresses
+        // Reset i to start looking again
+        if (i == 255) {
+            set_address_block();
+            i = 0;
+        }
+
+        // If found an open address (null addr)
+        // Return it
+        if (superblock_array[i] == 0)
+            return_addr = superblock_array[i];
+
+        i++;
+    }
+
+    return return_addr;
+}
+
+void set_address_block() {
+    // Presume the addresses are all null
+    // Seek to the one this address block points to
+    lseek(GLOBAL_PFD, superblock_array[255]*BLOCK_SIZE, SEEK_SET);
+    SBLOCK_ARRAY_ID = superblock_array[255];
+
+    // Reload the in memory address block
+    short temp;
+    for(short i = 0; i < 256; i++) {
+        read(GLOBAL_PFD, &temp, 2);
+        superblock_array[i] = temp;
+    }
+}
+
+
 /*
  * int bv_init(const char *fs_fileName);
  *
@@ -299,61 +340,48 @@ int BV_WTRUNC = 2;
 int bv_open(const char *fileName, int mode) {
     // Find null byte in fileName
     int foundNull = 0;
-    for (int i=0; i<32; i++) {
+    for (int i=0; i<strlen(fileName)+1; i++) {
         if(fileName[i] == '\0'){
             foundNull = 1;
             break;
         }
+    }
     // If nonexistent, return -1
     if (foundNull != 1) {
         char err[] = "FileName not nullbyte ended.\n";
         write(2, &err, sizeof(err));
         return -1;
     }
-  printf("%ld", strlen(fileName));
-  int name_length = sizeof(fileName);
-  printf("%d\n", name_length);
-  if(fileName[strlen(fileName)] != '\0'){
-    char err[] = "FileName not nullbyte ended.\n";
-    write(2, &err, sizeof(err));
-    return -1;
-  }
-  else if(strlen(fileName)>=32){
-    char err[] = "FileName too long.\n";
-    write(2, &err, sizeof(err));
-    return -1;
-  }
-  // See if the file exists, found_flag will be 1 if it does
-  int found_flag = 0;
-  int file_index = -1;
-  for(int i = 0; i<256; i++){
-    if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
-      found_flag = 1;
-      file_index = i;
-    }
-  }
-  for(int j=0; j<sizeof(superblock_array); j++){
-    // Found address in superblock
-    if(superblock_array[j] != 0){
-      time_t rawtime;
-      rawtime = time(NULL);
-      char name[32];
-      struct iNode tmp;
-      for(int i = 0; i<strlen(fileName); i++){
-        name = fileName[i];
-        fileName++;
-      }
-      struct iNode tmp = {name, 0, rawtime, 0, superblock_array[j], 0};
-      inode_arr[free_inode_index] = tmp;
-      superblock_array[j] = 0;
+    // Is file name too long
+    if(strlen(fileName)>=32){
+        char err[] = "FileName too long.\n";
+        write(2, &err, sizeof(err));
+        return -1;
     }
     // See if the file exists, found_flag will be 1 if it does
     int found_flag = 0;
     int file_index = -1;
-    for(int i = 0; i<256; i++){
+    for(int i = 0; i<MAX_FILES; i++){
         if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
             found_flag = 1;
             file_index = i;
+        }
+    }
+    for(int j=0; j<sizeof(superblock_array); j++){
+        // Found address in superblock
+        if(superblock_array[j] != 0){
+            time_t rawtime;
+            rawtime = time(NULL);
+            char name[32];
+            struct iNode tmp;
+            for(int i = 0; i<strlen(fileName); i++){
+                name = fileName[i];
+                fileName++;
+            }
+            struct iNode tmp = {name, 0, rawtime, 0, 0};
+            tmp.address[0] = superblock_array[j];
+            inode_arr[free_inode_index] = tmp;
+            superblock_array[j] = 0;
         }
     }
     // File does not exist
@@ -401,6 +429,7 @@ int bv_open(const char *fileName, int mode) {
 
     }
 }
+
 
 
 
