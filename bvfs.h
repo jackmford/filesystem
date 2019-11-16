@@ -313,7 +313,7 @@ int bv_open(const char *fileName, int mode) {
     write(2, &err, sizeof(err));
     return -1;
   }
-  else if(strlen(fileName)>32){
+  else if(strlen(fileName)>=32){
     char err[] = "FileName too long.\n";
     write(2, &err, sizeof(err));
     return -1;
@@ -347,16 +347,14 @@ int bv_open(const char *fileName, int mode) {
     // Found address in superblock
     if(superblock_array[j] != 0){
       time_t rawtime;
-      struct tm * timeinfo;
-      time(&rawtime);
-      timeinfo = localtime(&rawtime);
+      rawtime = time(NULL);
       char name[32];
       struct iNode tmp;
       for(int i = 0; i<strlen(fileName); i++){
-        tmp.fileName[i] = fileName[i];
+        name = fileName[i];
         fileName++;
       }
-      //struct iNode tmp = {name, 0, timeinfo, 0, superblock_array[j], 0};
+      struct iNode tmp = {name, 0, rawtime, 0, superblock_array[j], 0};
       inode_arr[free_inode_index] = tmp;
       superblock_array[j] = 0;
     }
