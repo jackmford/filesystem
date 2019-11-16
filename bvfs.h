@@ -297,30 +297,27 @@ int BV_WTRUNC = 2;
  *           stderr prior to returning.
  */
 int bv_open(const char *fileName, int mode) {
-    // Contact superblock arr to get address for new file
-    // Store this address in address of inode at 0
-    for (int i = 0; i < MAX_FILES; i++) {
-        // Find open iNode
-        if (inode_arr[i].timeinfo == 0) {
-            // on find:
-            // update name, time, mode
-            printf("about to write size: %ld with file name %s\n",strlen(fileName), fileName);
-            memcpy(&(inode_arr[i].fileName), fileName, strlen(fileName));
-
-            //memcpy(&(inode_arr[i].
-            break;
-        }
-    }
-
     printf("%ld", strlen(fileName));
     int name_length = sizeof(fileName);
     printf("%d\n", name_length);
-    if(fileName[strlen(fileName)] != '\0'){
+
+    // Find null byte in fileName
+    int foundNull = 0;
+    for (int i=0; i<32; i++) {
+        if(fileName[i] == '\0'){
+            foundNull = 1;
+            break;
+        }
+    }
+    // If nonexistent, return -1
+    if (foundNull != 1) {
         char err[] = "FileName not nullbyte ended.\n";
         write(2, &err, sizeof(err));
         return -1;
     }
-    else if(strlen(fileName)>32){
+
+    // File name must end with null byte, so continue testing
+    if (strlen(fileName)>=32){
         char err[] = "FileName too long.\n";
         write(2, &err, sizeof(err));
         return -1;
