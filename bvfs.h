@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <math.h>
 
 // Prototypes
 int bv_init(const char *fs_fileName);
@@ -43,6 +44,7 @@ int bv_write(int bvfs_FD, const void *buf, size_t count);
 int bv_read(int bvfs_FD, void *buf, size_t count);
 int bv_unlink(const char* fileName);
 void bv_ls();
+
 
 // max of 256 iNodes
 struct iNode{
@@ -64,11 +66,15 @@ const int MAX_FILE_NAME = 32;
 const int INODE_START = 512;
 int GLOBAL_PFD;
 int INIT_FLAG = 0;
-int SBLOCK_ARRAY_ID;
+short SBLOCK_ARRAY_ID;
 short superblock_array[256];
 struct iNode inode_arr[256];
 const int ENDOFMETA = sizeof(inode_arr)+512;
 short superblock_ids[64];
+
+
+short get_new_address();
+void give_back_block(short block_address);
 
 // Write inode array to file
 void write_inode(){
@@ -88,6 +94,7 @@ void write_superblock_ids(){
 
 }
 
+// Reads in a linked list node
 void set_address_block() {
     // Presume the addresses are all null
     // Seek to the one this address block points to
@@ -105,6 +112,8 @@ void set_address_block() {
 // Give block back if not being used anymore (all empty or unlinking)
 // Finds a place in the superblock array for it to live
 // NOT for deleting files
+// IF THERE IS NO SPACE IN SUPERBLOCK
+// this will create a new superblock and store the address there
 void give_back_block(short block_address){
     // Look through superblock_array and see if there is an open space currently
     int open = 0;
@@ -127,6 +136,25 @@ void give_back_block(short block_address){
         superblock_array[offset] = block_address;
         write_superblock();
     }
+    else if(open == 0){
+      // Didn't find any superblock space 
+      // Look to create a new superblock if there is empty room 
+      for(int i = 0; i<64; i++){
+        if(superblock_ids[i] == 0){
+          // Finding an address for a new superblock
+          short return_addr = 0;
+          short i = 0;
+          short addr = get_new_address();
+          superblock_ids[i] = addr;
+          short newaddrs[256];
+          newaddrs[0] = block_address;
+          lseek(GLOBAL_PFD, addr*512, SEEK_SET);
+          write(GLOBAL_PFD, (void*)&newaddrs, sizeof(newaddrs));
+          write_superblock_ids();
+          return;
+        }
+      }
+    }
     else{
         char err[] = "Bad error there are no spaces to put an address\n";
         write(2, &err, sizeof(err));
@@ -134,6 +162,7 @@ void give_back_block(short block_address){
 }
 
 
+// Get a new memory address
 short get_new_address() {
     // Try to find an open block address
     // to hand back
@@ -144,14 +173,24 @@ short get_new_address() {
         // Call function to find new block of addresses
         // Reset i to start looking again
         if (i == 255) {
+          //TODO: give up super block and put into system
+            for(int i = 0; i<64; i++){
+              if(superblock_ids[i] == SBLOCK_ARRAY_ID){
+                //found the empty superblock node
+                give_back_block(SBLOCK_ARRAY_ID);
+                superblock_ids[i] = 0;
+              }
+            }
             set_address_block();
             i = 0;
         }
 
         // If found an open address (null addr)
         // Return it
-        if (superblock_array[i] == 0)
+        if (superblock_array[i] != 0){
             return_addr = superblock_array[i];
+            break;
+        }
 
         i++;
     }
@@ -616,9 +655,9 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
  *           Also, print a meaningful error to stderr prior to returning.
  */
 int bv_unlink(const char* fileName) {
-    //
-    //inode_arr[i] = {0, 0, 0, 0, 0};
-    // write_inode();
+    //TODO:
+    //Remove from inode array
+    //Giving back all blocks
     int check = 0;
     int inode_index = 0;
     for(int i = 0; i < 256; i++){
@@ -633,7 +672,13 @@ int bv_unlink(const char* fileName) {
         return -1;
     }
     else{
-
+      printf("Giving up %s\n", inode_arr[inode_index].fileName);
+      for(int i = 0; i<(inode_arr[inode_index].size/512+1)/512; i++){
+        give_back_block(inode_arr[inode_index].address[i]);
+      }
+      struct iNode tmp = {0, 0, 0, 0, 0};
+      inode_arr[inode_index] = tmp;
+      return 0;
     }
 }
 
@@ -679,8 +724,9 @@ void bv_ls() {
     }
     printf("| %d files\n", numfiles);
     for(int i = 0; i<256; i++){
+        int ceil = (inode_arr[i].size + 512 -1)/512;
         if(inode_arr[i].timeinfo!=0){
-            printf("| bytes: %d blocks %d, %.24s, %s\n", inode_arr[i].size, inode_arr[i].size/512, ctime(&inode_arr[i].timeinfo), inode_arr[i].fileName);
+            printf("| bytes: %d blocks: %d, %.24s, %s\n", inode_arr[i].size, ceil, ctime(&inode_arr[i].timeinfo), inode_arr[i].fileName);
         }
     }
 }
