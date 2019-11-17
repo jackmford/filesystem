@@ -520,16 +520,14 @@ int bv_open(const char *fileName, int mode) {
       // Found address in current superblock
       if(superblock_array[j] != 0){
         time_t newtime = time(NULL);
-        printf("%p\n", &newtime);
-        printf("%s\n", ctime(&newtime));
         char name[32];
         struct iNode tmp;
         memcpy(tmp.fileName, fileName, strlen(fileName));
         tmp.address[0] = superblock_array[j];
         tmp.size = 0;
         tmp.timeinfo = newtime;
-        printf("Address: %d\n", tmp.address[0]);
         inode_arr[free_inode_index] = tmp;
+        printf("Address: %d\n", tmp.address[0]);
         printf("Filename: %s\n", inode_arr[free_inode_index].fileName);
         printf("Time: %s\n", ctime(&tmp.timeinfo));
         superblock_array[j] = 0;
@@ -606,7 +604,86 @@ int bv_close(int bvfs_FD) {
  *           prior to returning.
  */
 int bv_write(int bvfs_FD, const void *buf, size_t count) {
-}
+  // Look for existing file in inode with corresponding FD
+  printf("Numbytes to write: %ld\n", count);
+  int inode_index = -1;
+  for(int i = 0; i<MAX_FILES; i++){
+    if(inode_arr[i].address[0] == bvfs_FD){
+      printf("Inode address: %d\n", inode_arr[i].address[0]);
+      inode_index = i;
+    }
+  }
+
+  // Bail out if no file found
+  if(inode_index < 0){
+    char err[] = "File not found.\n";
+    write(2, &err, sizeof(err));
+    return -1;
+  }
+  else{
+    // If a file has been found
+    //
+    // Calculate number of blocks needed
+    // Find those blocks, put them in an array
+    // Write to them
+    // Return number of bytes written
+    //
+
+    // Calculating number of blocks needed and getting open addresses
+    int numblocks = (count + 512 -1)/512;
+    printf("Need %d blocks\n", numblocks);
+    short adresses[numblocks];
+    for(int i = 0; i<numblocks; i++){
+        short tmp = get_new_address();
+        printf("Found address: %d\n", tmp);
+        adresses[i] = tmp;
+    }
+
+      // Can we write it all if it is less than 512?
+      if(count < 512){
+        lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
+        for(int i = 0; i<count; i++){
+          printf("%p,", buf);
+          write(GLOBAL_PFD, buf, 1);
+          buf++;
+        }
+            // Trying to read it back for testing
+            lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
+            short num;
+            read(GLOBAL_PFD, &num, count);
+            printf("Trying to read: %d\n", num);
+        return count; 
+      }
+      else{
+        int ctr = 0;
+        int index = 0;
+        // Write all bytes
+        while(index < numblocks){
+          lseek(GLOBAL_PFD, adresses[ctr]*512, SEEK_SET);
+          if(numblocks-1 == index){
+            int bytesleft = count-(ctr);
+            for(int i = 0; i<bytesleft; i++){
+              write(GLOBAL_PFD, buf, 1);
+              buf++;
+              ctr++;
+            }
+            // Trying to read it back for testing
+            lseek(GLOBAL_PFD, adresses[ctr]*512, SEEK_SET);
+            short readthis[10];
+            read(GLOBAL_PFD, &readthis, count);
+            printf("Trying to read: %d\n", readthis[0]);
+            return ctr;
+          }
+          for(int i = 0; i<512; i++){
+            write(GLOBAL_PFD, buf, 1);
+            buf++;
+            ctr++;
+          }
+          index++;
+        }
+      }
+    }
+  }
 
 
 
@@ -672,7 +749,7 @@ int bv_unlink(const char* fileName) {
         return -1;
     }
     else{
-      printf("Giving up %s\n", inode_arr[inode_index].fileName);
+      printf("Unlinking %s\n", inode_arr[inode_index].fileName);
       for(int i = 0; i<(inode_arr[inode_index].size/512+1)/512; i++){
         give_back_block(inode_arr[inode_index].address[i]);
       }
