@@ -68,6 +68,56 @@ int SBLOCK_ARRAY_ID;
 short superblock_array[256];
 struct iNode inode_arr[256];
 const int ENDOFMETA = sizeof(inode_arr)+512;
+short superblock_ids[64];
+
+// Write inode array to file
+void write_inode(){
+    lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
+    write(GLOBAL_PFD, (void*)(&inode_arr), sizeof(inode_arr));
+}
+
+// Write superblock to file
+void write_superblock(){
+    lseek(GLOBAL_PFD, SBLOCK_ARRAY_ID*BLOCK_SIZE, SEEK_SET);
+    write(GLOBAL_PFD, (void*)&superblock_array, sizeof(superblock_array));
+}
+
+void write_superblock_ids(){
+    lseek(GLOBAL_PFD, 4, SEEK_SET);
+    write(GLOBAL_PFD, (void*)&superblock_ids, sizeof(superblock_ids));
+
+}
+
+// Give block back if not being used anymore (all empty or unlinking)
+// Finds a place in the superblock array for it to live
+// NOT for deleting files
+void give_back_block(short block_address){
+    // Look through superblock_array and see if there is an open space currently
+    int open = 0;
+    int offset = 0;
+    int ctr = 0;
+    while(open != 1){
+        for(int i = 0; i < 256; i++){
+            if(superblock_array[i] == 0){
+                open = 1;
+                offset = i;
+                break;
+            }
+            ctr++;
+            if(ctr = 255 && open == 0){
+                //set_address_block();
+            }
+        }
+    }
+    if(open == 1){
+        superblock_array[offset] = block_address;
+        write_superblock();
+    }
+    else{
+        char err[] = "Bad error there are no spaces to put an address\n";
+        write(2, &err, sizeof(err));
+    }
+}
 
 
 short get_new_address() {
@@ -120,7 +170,6 @@ void set_address_block() {
  *   1) If the file (fs_fileName) exists, the function will initialize in-memory
  *   data structures to help manage the file system methods that may be invoked.
  *
- *   2) If the file (fs_fileName) does not exist, the function will create that
  *   file as the representation of a new file system and initialize in-memory
  *   data structures to help manage the file system methods that may be invoked.
  *
@@ -187,6 +236,17 @@ int bv_init(const char *fs_fileName) {
             lseek(pFD, INODE_START, SEEK_SET);
             read(pFD, &inode_arr, sizeof(inode_arr));
 
+            // try printing out linked list nodes
+            short blockidarray[63];
+            lseek(pFD, 4, SEEK_SET);
+            read(pFD, &blockidarray, sizeof(blockidarray));
+            printf("Superblock_ids:\n");
+            for(int i = 0; i<63; i++){
+                superblock_ids[i] = blockidarray[i];
+                printf("%d\n", superblock_ids[i]);
+            }
+
+
             close(pFD);
             return 0;
         }
@@ -230,12 +290,12 @@ int bv_init(const char *fs_fileName) {
 
 
         struct iNode test = {"hello\0", 1, rawtime, 1, 0};
-        printf("%ld\n", sizeof(test));
-        printf("%ld\n", sizeof(test.timeinfo));
-        printf("%ld\n", sizeof(test.fileName));
-        printf("%ld\n", sizeof(test.size));
-        printf("%ld\n", sizeof(test.dummydata));
-        printf("%ld\n", sizeof(test.address));
+        //printf("%ld\n", sizeof(test));
+        //printf("%ld\n", sizeof(test.timeinfo));
+        //printf("%ld\n", sizeof(test.fileName));
+        //printf("%ld\n", sizeof(test.size));
+        //printf("%ld\n", sizeof(test.dummydata));
+        //printf("%ld\n", sizeof(test.address));
         inode_arr[0] = test;
         struct iNode dummy = {"hello dummy\0", 1, rawtime, 1, 0};
         inode_arr[200] = dummy;
@@ -252,8 +312,12 @@ int bv_init(const char *fs_fileName) {
         // Write addresses to next 256 blocks
         short blockNum = (ENDOFMETA/BLOCK_SIZE);
 
+        // for all super block ids
+        short blocklist[63];
+        int ctr = 0;
+
         SBLOCK_ARRAY_ID = blockNum;
-        printf("%d\n", blockNum);
+        //printf("%d\n", blockNum);
         while (blockNum < MAX_BLOCKS) {
             for (short i = blockNum+1; i<=(blockNum+256);i++) {
                 if(i*BLOCK_SIZE<=PARTITION_SIZE)
@@ -261,9 +325,18 @@ int bv_init(const char *fs_fileName) {
                 else
                     write(pFD, 0, 2);
             }
+            blocklist[ctr] = blockNum;
+            printf("%d\n", blocklist[ctr]);
+            ctr++;
+
             blockNum += 256;
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
         }
+
+        // write all linked list node ids to front super
+        lseek(pFD, 4, SEEK_SET);
+        write(pFD, (void*)&blocklist, sizeof(blocklist));
+
 
         close(pFD);
         return 0;
@@ -292,8 +365,10 @@ int bv_destroy() {
     // Write the iNode array back to file to save changes
     if(INIT_FLAG == 1){
         // File has been initialized.
-        lseek(GLOBAL_PFD, INODE_START, SEEK_SET);
-        write(GLOBAL_PFD, (void*)(&inode_arr), sizeof(inode_arr));
+        // Write all essential data structures back to file
+        write_inode();
+        write_superblock();
+        write_superblock_ids();
         close(GLOBAL_PFD);
     }
     else{
@@ -352,46 +427,33 @@ int bv_open(const char *fileName, int mode) {
         write(2, &err, sizeof(err));
         return -1;
     }
-    // Is file name too long
+    printf("%ld", strlen(fileName));
+    int name_length = sizeof(fileName);
+    printf("%d\n", name_length);
     if(strlen(fileName)>=32){
         char err[] = "FileName too long.\n";
         write(2, &err, sizeof(err));
         return -1;
     }
+
     // See if the file exists, found_flag will be 1 if it does
     int found_flag = 0;
     int file_index = -1;
-    for(int i = 0; i<MAX_FILES; i++){
+    for(int i = 0; i<256; i++){
         if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
             found_flag = 1;
             file_index = i;
         }
     }
-    for(int j=0; j<sizeof(superblock_array); j++){
-        // Found address in superblock
-        if(superblock_array[j] != 0){
-            time_t rawtime;
-            rawtime = time(NULL);
-            char name[32];
-            struct iNode tmp;
-            for(int i = 0; i<strlen(fileName); i++){
-                name = fileName[i];
-                fileName++;
-            }
-            struct iNode tmp = {name, 0, rawtime, 0, 0};
-            tmp.address[0] = superblock_array[j];
-            inode_arr[free_inode_index] = tmp;
-            superblock_array[j] = 0;
-        }
-    }
-    // File does not exist
     // Read
     if(found_flag == 0 && mode == 0){
         char err[] = "Opened in read mode but no file found.\n";
         write(2, &err, sizeof(err));
         return -1;
     }
+
     // Write
+    // Look through inode array for free spot
     int free_inode_index = -1;
     if(found_flag == 1 && mode == 1){
         for(int i = 0; i<MAX_FILES; i++){
@@ -400,33 +462,39 @@ int bv_open(const char *fileName, int mode) {
             }
         }
     }
-    //get new superblock if empty
-    // Write
-    //
-    //
-    // File Exists
-    // Read
-    // Write Concat
-    // Write Truncate
-    if(found_flag == 0 && mode == 2){
-        for(int i = 1; i<MAX_FILE_BLOCKS; i++){
-            //      inode_arr[file_index].address[i] = 0;
-        }
-        // Write
-        //
-        //
-        // File Exists
-        // Read
-        // Write Concat
-        // Write Truncate
-        if(found_flag == 0 && mode == 2){
-            for(int i = 1; i<MAX_FILE_BLOCKS; i++){
-                inode_arr[file_index].address[i] = 0;
-            }
 
+    // Opening brand new file
+    if(found_flag == 0 && mode != 0){
+        for(int j=0; j<sizeof(superblock_array); j++){
+            // Found address in current superblock
+            if(superblock_array[j] != 0){
+                time_t rawtime;
+                rawtime = time(NULL);
+                char name[32];
+                //struct iNode tmp;
+                struct iNode tmp = {0, 0, rawtime, 0, 0, 0};
+                memcpy(tmp.fileName, fileName, strlen(fileName));
+                tmp.address[0] = superblock_array[j];
+                inode_arr[free_inode_index] = tmp;
+                superblock_array[j] = 0;
+                return tmp.address[0];
+            }
+        }
+    }
+    else if(found_flag == 1){
+        if(mode == 2){
             return inode_arr[file_index].address[0];
         }
-
+        else if(mode == 1){
+            for(int i = 0; i<MAX_FILE_BLOCKS-1; i++){
+                if(inode_arr[file_index].address[i] != 0 && inode_arr[file_index].address[i+1] == 0){
+                    return inode_arr[file_index].address[i];
+                }
+            }
+        }
+        else if (mode == 0) {
+            return inode_arr[file_index].address[0];
+        }
     }
 }
 
@@ -528,6 +596,25 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
  *           Also, print a meaningful error to stderr prior to returning.
  */
 int bv_unlink(const char* fileName) {
+    //
+    //inode_arr[i] = {0, 0, 0, 0, 0};
+    // write_inode();
+    int check = 0;
+    int inode_index = 0;
+    for(int i = 0; i < 256; i++){
+        if(strcmp(inode_arr[i].fileName, fileName) == 0){
+            check = 1;
+            inode_index = i;
+        }
+    }
+    if(check == 0){
+        char err[] = "File not found.\n";
+        write(2, &err, sizeof(err));
+        return -1;
+    }
+    else{
+
+    }
 }
 
 
