@@ -484,10 +484,11 @@ int bv_open(const char *fileName, int mode) {
         printf("%p\n", &newtime);
         printf("%s\n", ctime(&newtime));
         char name[32];
-        struct iNode tmp = {0, 0, newtime, 0, 0, 0};
-        printf("%p\n", &tmp.timeinfo);
+        struct iNode tmp;
         memcpy(tmp.fileName, fileName, strlen(fileName));
         tmp.address[0] = superblock_array[j];
+        tmp.size = 0;
+        tmp.timeinfo = newtime;
         printf("Address: %d\n", tmp.address[0]);
         inode_arr[free_inode_index] = tmp;
         printf("Filename: %s\n", inode_arr[free_inode_index].fileName);
