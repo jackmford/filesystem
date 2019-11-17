@@ -292,6 +292,8 @@ int bv_init(const char *fs_fileName) {
             lseek(pFD, blockNum * BLOCK_SIZE, SEEK_SET);
         }
 
+        set_superblock_array();
+
         // write all linked list node ids to front super
         lseek(pFD, 4, SEEK_SET);
         write(pFD, (void*)&blocklist, sizeof(blocklist));
@@ -386,9 +388,9 @@ int bv_open(const char *fileName, int mode) {
         write(2, &err, sizeof(err));
         return -1;
     }
-  printf("%ld", strlen(fileName));
+  //printf("%ld", strlen(fileName));
   int name_length = sizeof(fileName);
-  printf("%d\n", name_length);
+  //printf("%d\n", name_length);
   if(strlen(fileName)>=32){
     char err[] = "FileName too long.\n";
     write(2, &err, sizeof(err));
@@ -411,7 +413,6 @@ int bv_open(const char *fileName, int mode) {
         return -1;
     }
 
-    // Write
     // Look through inode array for free spot
     int free_inode_index = -1;
     if(found_flag == 1 && mode == 1){
@@ -424,7 +425,9 @@ int bv_open(const char *fileName, int mode) {
 
     // Opening brand new file
   if(found_flag == 0 && mode != 0){
-    for(int j=0; j<sizeof(superblock_array); j++){
+    printf("Making new file\n");
+    for(int j=0; j<256; j++){
+      printf("%d\n", superblock_array[j]);
       // Found address in current superblock
       if(superblock_array[j] != 0){
         time_t rawtime;
@@ -434,6 +437,7 @@ int bv_open(const char *fileName, int mode) {
         struct iNode tmp = {0, 0, rawtime, 0, 0, 0};
         memcpy(tmp.fileName, fileName, strlen(fileName));
         tmp.address[0] = superblock_array[j];
+        printf("Address: %d\n", tmp.address[0]);
         inode_arr[free_inode_index] = tmp;
         superblock_array[j] = 0;
         return tmp.address[0];
@@ -442,14 +446,20 @@ int bv_open(const char *fileName, int mode) {
   }
   else if(found_flag == 1){
     if(mode == 2){
+      printf("Returning %s\n", inode_arr[file_index].fileName);
       return inode_arr[file_index].address[0];
     }
     else if(mode == 1){
       for(int i = 0; i<MAX_FILE_BLOCKS-1; i++){
         if(inode_arr[file_index].address[i] != 0 && inode_arr[file_index].address[i+1] == 0){
+          printf("Returning %s\n", inode_arr[file_index].fileName);
           return inode_arr[file_index].address[i];
         }
       }
+    }
+    else if(mode == 0){
+      printf("Returning %s\n", inode_arr[file_index].fileName);
+      return inode_arr[file_index].address[0];
     }
   }
 }
