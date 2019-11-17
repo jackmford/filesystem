@@ -5,8 +5,13 @@ int main(int argc, char** argv) {
   const char *f = "test";
   bv_init(f);
   bv_ls();
-  const char *y = "testinging";
-  bv_open(y, 2);
-  bv_destroy();
+//  bv_destroy();
+  bv_ls();
+  const char *t = "testingopen";
+  short addr = bv_open(t, 2);
+  printf("Driver %d\n", addr);
+  short num = 2;
+  const void *ptr = &num;
+  bv_write(addr, &num, 2);
   bv_ls();
 }

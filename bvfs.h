@@ -231,6 +231,7 @@ int bv_init(const char *fs_fileName) {
             // file already exists
             pFD = open(fs_fileName, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR);
             GLOBAL_PFD = pFD;
+            printf("File descriptor: %d\n",pFD);
             INIT_FLAG = 1; // Assert we have ran init
 
             // Get the super block position
@@ -287,7 +288,7 @@ int bv_init(const char *fs_fileName) {
             }
 
 
-            close(pFD);
+            //close(pFD);
             return 0;
         }
         else {
@@ -386,7 +387,7 @@ int bv_init(const char *fs_fileName) {
         write(pFD, (void*)&blocklist, sizeof(blocklist));
 
 
-        close(pFD);
+        //close(pFD);
         return 0;
     }
 }
@@ -641,17 +642,20 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
 
       // Can we write it all if it is less than 512?
       if(count < 512){
+          printf("Going to write to spot: %d\n\n",adresses[0]*512);
         lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
-        for(int i = 0; i<count; i++){
+          write(GLOBAL_PFD, buf, 2);
+       /* for(int i = 0; i<count; i++){
           printf("%p,", buf);
-          write(GLOBAL_PFD, buf, 1);
-          buf++;
-        }
+          write(GLOBAL_PFD, &buf, 2);
+          ++(buf);
+        }*/
             // Trying to read it back for testing
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
-            short num;
-            read(GLOBAL_PFD, &num, count);
+            short num = 99;
+            size_t x = read(GLOBAL_PFD, &num, 2);
             printf("Trying to read: %d\n", num);
+            printf("Read: %ld\n",x);
         return count; 
       }
       else{
