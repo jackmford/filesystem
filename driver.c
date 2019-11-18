@@ -17,8 +17,8 @@ int main(int argc, char** argv) {
 
   const char *h = "tylersfile";
   addr = bv_open(h, 2);
-  int nums[400];
-  for (int i = 0; i < 400; i++)
+  int nums[34000];
+  for (int i = 0; i < 34000; i++)
       nums[i] = i*2;
   bv_write(addr, &nums, sizeof(nums));
   bv_ls();
