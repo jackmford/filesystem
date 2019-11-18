@@ -14,4 +14,12 @@ int main(int argc, char** argv) {
   const void *ptr = &num;
   bv_write(addr, &num, 2);
   bv_ls();
+
+  const char *h = "tylersfile";
+  addr = bv_open(h, 2);
+  int nums[400];
+  for (int i = 0; i < 400; i++)
+      nums[i] = i*2;
+  bv_write(addr, &nums, sizeof(nums));
+  bv_ls();
 }

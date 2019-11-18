@@ -187,6 +187,7 @@ short get_new_address() {
 
         // If found an open address (null addr)
         // Return it
+        printf("Looking at returning address: %d\n",superblock_array[i]);
         if (superblock_array[i] != 0){
             return_addr = superblock_array[i];
             break;
@@ -663,7 +664,7 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         int index = 0;
         // Write all bytes
         while(index < numblocks){
-          lseek(GLOBAL_PFD, adresses[ctr]*512, SEEK_SET);
+          lseek(GLOBAL_PFD, adresses[index]*512, SEEK_SET);
           if(numblocks-1 == index){
             int bytesleft = count-(ctr);
             for(int i = 0; i<bytesleft; i++){
@@ -672,8 +673,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
               ctr++;
             }
             // Trying to read it back for testing
-            lseek(GLOBAL_PFD, adresses[ctr]*512, SEEK_SET);
-            short readthis[10];
+            lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
+            int readthis[200];
             read(GLOBAL_PFD, &readthis, count);
             printf("Trying to read: %d\n", readthis[0]);
             return ctr;
