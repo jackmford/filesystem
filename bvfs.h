@@ -604,7 +604,7 @@ int bv_close(int bvfs_FD) {
     int check = 0;
     int inode_index = 0;
     for(int i = 0; i < 256; i++){
-      printf("%s %d\n",inode_arr[i].fileName, inode_arr[i].address[0]);
+      //printf("%s %d\n",inode_arr[i].fileName, inode_arr[i].address[0]);
       for(int j = 0; j<128; j++){
         if(bvfs_FD >= inode_arr[i].address[j] && bvfs_FD <= inode_arr[i].address[j]){
           printf("In close: %d\n", inode_arr[i].address[j]);
