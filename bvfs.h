@@ -100,6 +100,7 @@ void set_address_block() {
     // Seek to the one this address block points to
     lseek(GLOBAL_PFD, superblock_array[255]*BLOCK_SIZE, SEEK_SET);
     SBLOCK_ARRAY_ID = superblock_array[255];
+    printf("Set superblock to this number: %d\n",superblock_array[255]);
 
     // Reload the in memory address block
     short temp;
@@ -120,6 +121,7 @@ void give_back_block(short block_address){
     int offset = 0;
     int ctr = 0;
     while(open != 1){
+      printf("In while\n");
         for(int i = 0; i < 256; i++){
             if(superblock_array[i] == 0){
                 open = 1;
@@ -604,8 +606,6 @@ int bv_close(int bvfs_FD) {
     }
     else{
       write_inode();
-      write_superblock();
-      write_superblock_ids();
     }
 }
 
@@ -669,7 +669,7 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         short adresses[numblocks];
         for(int i = 0; i<numblocks; i++){
             short tmp = get_new_address();
-            printf("Found address: %d\n", tmp);
+            printf("Found address: %d in superblock :%d \n", tmp, SBLOCK_ARRAY_ID);
             adresses[i] = tmp;
         }
 
@@ -799,7 +799,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
 
 
 /*
- * int bv_unlink(const char* fileName);
+ * int bv_unnlink(const char* fileName);
  *
  * This function is intended to delete a file that has been allocated within
  * the bvfs file system.
@@ -831,9 +831,11 @@ int bv_unlink(const char* fileName) {
         return -1;
     }
     else{
-        printf("Unlinking %s\n", inode_arr[inode_index].fileName);
-        for(int i = 0; i<(inode_arr[inode_index].size/512+1)/512; i++){
-            printf("Calling givebackblock\n");
+
+        printf("%d\n", inode_arr[inode_index].size);
+        int c = (inode_arr[inode_index].size+512-1)/512;
+        printf("%d\n", c);
+        for(int i = 0; i<(inode_arr[inode_index].size+512-1)/512; i++){
             give_back_block(inode_arr[inode_index].address[i]);
         }
         struct iNode tmp = {0, 0, 0, 0, 0};
