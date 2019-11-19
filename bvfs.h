@@ -675,6 +675,29 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
             size_t x = read(GLOBAL_PFD, &num, count);
             printf("Trying to read: %d\n", num);
             printf("Read bytes: %ld\n",x);
+
+            // Update the inode data
+            inode_arr[inode_index].size = inode_arr[inode_index].size+count;
+            inode_arr[inode_index].timeinfo = time(NULL);
+            // If the file was new, or in truncate mode
+            if(bvfs_FD == inode_arr[inode_index].address[0])
+              memcpy(inode_arr[inode_index].address, adresses, sizeof(adresses));
+            else{
+            // If the file was in concat mode, need to add on new addresses to end of address array
+              for(int j = 0; j<127; j++){
+                if(inode_arr[inode_index].address[j+1]==0 && inode_arr[inode_index].address[j]!=0){
+                  j++;
+                  int c = 0;
+                  for(int x = j; x<128; x++){
+                    if(c == numblocks)
+                     break;
+                    inode_arr[inode_index].address[x] = adresses[c];
+                    c++;
+                  }
+                  return count;
+                }
+              }
+            }
             return count; 
         }
         else{
