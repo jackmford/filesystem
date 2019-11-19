@@ -589,7 +589,7 @@ int bv_close(int bvfs_FD) {
     int check = 0;
     int inode_index = 0;
     for(int i = 0; i < 256; i++){
-        if(inode_arr[i].address[0] == 0 bvfs_FD){
+        if(inode_arr[i].address[0] == bvfs_FD){
             check = 1;
             inode_index = i;
         }
@@ -633,11 +633,15 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     // Look for existing file in inode with corresponding FD
     printf("Numbytes to write: %ld\n", count);
     int inode_index = -1;
+    int address_index = -1;
     for(int i = 0; i<MAX_FILES; i++){
-        if(inode_arr[i].address[0] == bvfs_FD){
-            printf("Inode address: %d\n", inode_arr[i].address[0]);
-            inode_index = i;
+      for(int j = 0; j<128; j++){
+        if(inode_arr[i].address[j] == bvfs_FD){
+          printf("Inode address: %d\n", inode_arr[j].address[0]);
+          inode_index = i;
+          address_index = j;
         }
+      }
     }
 
     // Bail out if no file found
@@ -707,8 +711,31 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
             while(index < numblocks){
                 lseek(GLOBAL_PFD, adresses[index]*512, SEEK_SET);
                 if(numblocks-1 == index){
-                    int bytesleft = count-(ctr);
-                    write(GLOBAL_PFD, buf, bytesleft);
+                  int bytesleft = count-(ctr);
+                  write(GLOBAL_PFD, buf, bytesleft);
+
+                  // Update the inode data
+                  inode_arr[inode_index].size = inode_arr[inode_index].size+count;
+                  inode_arr[inode_index].timeinfo = time(NULL);
+                  // If the file was new, or in truncate mode
+                  if(bvfs_FD == inode_arr[inode_index].address[0])
+                    memcpy(inode_arr[inode_index].address, adresses, sizeof(adresses));
+                  else{
+                  // If the file was in concat mode, need to add on new addresses to end of address array
+                    for(int j = 0; j<127; j++){
+                      if(inode_arr[inode_index].address[j+1]==0 && inode_arr[inode_index].address[j]!=0){
+                        j++;
+                        int c = 0;
+                        for(int x = j; x<128; x++){
+                          if(c == numblocks)
+                           break;
+                          inode_arr[inode_index].address[x] = adresses[c];
+                          c++;
+                        }
+                        return count;
+                      }
+                    }
+                  }
 
                 for (int k = 0; k < 260; k++) {
                     // Read back for testing
