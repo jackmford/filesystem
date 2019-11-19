@@ -606,10 +606,11 @@ int bv_close(int bvfs_FD) {
     for(int i = 0; i < 256; i++){
       //printf("%s %d\n",inode_arr[i].fileName, inode_arr[i].address[0]);
       for(int j = 0; j<128; j++){
-        if(bvfs_FD >= inode_arr[i].address[j] && bvfs_FD <= inode_arr[i].address[j]){
+        if(bvfs_FD == inode_arr[i].address[0]) {
           printf("In close: %d\n", inode_arr[i].address[j]);
             check = 1;
             inode_index = i;
+            break;
         }
       }
     }
@@ -664,6 +665,9 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     int inode_index = -1;
     int address_index = -1;
     int seekto = 0;
+    int numblocks = (count + 512 -1)/512;
+    short startPos = 0;
+    short adresses[numblocks];
 
     for(int i = 0; i<MAX_FILES; i++){
       if(inode_arr[i].address[0] == read_only_files[i] && inode_arr[i].address[0]==bvfs_FD){
@@ -681,6 +685,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
           if(inode_arr[i].size == 0){
             inode_index = i;
             seekto = inode_arr[i].address[0]*512;
+            adresses[0] = inode_arr[i].address[0];
+            startPos = 1;
             break;
           }
           else{
@@ -727,10 +733,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         //
 
         // Calculating number of blocks needed and getting open addresses
-        int numblocks = (count + 512 -1)/512;
         printf("Need %d blocks\n", numblocks);
-        short adresses[numblocks];
-        for(int i = 0; i<numblocks; i++){
+        for(int i = startPos; i<numblocks + startPos; i++){
             short tmp = get_new_address();
             printf("Found address: %d in superblock :%d \n", tmp, SBLOCK_ARRAY_ID);
             adresses[i] = tmp;
@@ -847,6 +851,7 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
  */
 int bv_read(int bvfs_FD, void *buf, size_t count) {
     // Seek to file start
+    // FUCKING IDIOT
     lseek(GLOBAL_PFD, bvfs_FD*BLOCK_SIZE, SEEK_SET);
     return read(GLOBAL_PFD, buf, count);
 }
