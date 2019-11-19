@@ -52,7 +52,8 @@ struct iNode{
     int size; // 4 bytes
     time_t timeinfo; // 8 bytes
     short address[128]; // 256 bytes
-    int dummydata[51];
+    int read_cursor;
+    int dummydata[50];
 };
 
 // Global variables
@@ -343,7 +344,7 @@ int bv_init(const char *fs_fileName) {
         rawtime = time(NULL);
 
 
-        struct iNode test = {"hello\0", 1, rawtime, 1, 0};
+        struct iNode test = {"hello\0", 1, rawtime, 1, 0, 0};
         //printf("%ld\n", sizeof(test));
         //printf("%ld\n", sizeof(test.timeinfo));
         //printf("%ld\n", sizeof(test.fileName));
@@ -351,7 +352,7 @@ int bv_init(const char *fs_fileName) {
         //printf("%ld\n", sizeof(test.dummydata));
         //printf("%ld\n", sizeof(test.address));
         inode_arr[0] = test;
-        struct iNode dummy = {"hello dummy\0", 1, rawtime, 1, 0};
+        struct iNode dummy = {"hello dummy\0", 1, rawtime, 1, 0, 0};
         inode_arr[200] = dummy;
 
         lseek(pFD, 0, SEEK_SET); // Seek to 0
@@ -541,6 +542,7 @@ int bv_open(const char *fileName, int mode) {
                 tmp.address[0] = superblock_array[j];
                 tmp.size = 0;
                 tmp.timeinfo = newtime;
+                tmp.read_cursor = 0;
                 inode_arr[free_inode_index] = tmp;
                 printf("Address: %d\n", inode_arr[free_inode_index].address[0]);
                 printf("Filename: %s\n", inode_arr[free_inode_index].fileName);
@@ -600,9 +602,9 @@ int bv_open(const char *fileName, int mode) {
  *           prior to returning.
  */
 int bv_close(int bvfs_FD) {
-    printf("In close %d\n", bvfs_FD);
     int check = 0;
     int inode_index = 0;
+    printf("BVFS FS%d\n", bvfs_FD);
     for(int i = 0; i < 256; i++){
       //printf("%s %d\n",inode_arr[i].fileName, inode_arr[i].address[0]);
       for(int j = 0; j<128; j++){
@@ -928,7 +930,7 @@ int bv_unlink(const char* fileName) {
         for(int i = 0; i<(inode_arr[inode_index].size+512-1)/512; i++){
             give_back_block(inode_arr[inode_index].address[i]);
         }
-        struct iNode tmp = {0, 0, 0, 0, 0};
+        struct iNode tmp = {0, 0, 0, 0, 0, 0};
         inode_arr[inode_index] = tmp;
         return 0;
     }
