@@ -128,7 +128,7 @@ void give_back_block(short block_address){
             }
             ctr++;
             if(ctr = 255 && open == 0){
-                //set_address_block();
+                set_address_block();
             }
         }
     }
@@ -541,13 +541,18 @@ int bv_open(const char *fileName, int mode) {
     else if(found_flag == 1){
         if(mode == 2){
             printf("Returning %s\n", inode_arr[file_index].fileName);
+            for(int i = 0; i<(inode_arr[file_index].size/512+1)/512; i++){
+                give_back_block(inode_arr[file_index].address[i]);
+            }
+
             return inode_arr[file_index].address[0];
         }
         else if(mode == 1){
             for(int i = 0; i<MAX_FILE_BLOCKS-1; i++){
                 if(inode_arr[file_index].address[i] != 0 && inode_arr[file_index].address[i+1] == 0){
                     printf("Returning %s\n", inode_arr[file_index].fileName);
-                    return inode_arr[file_index].address[i];
+                    return inode_arr[file_index].address[i]*512 + inode_arr[file_index].size%512+1;
+                    //return inode_arr[file_index].address[i];
                 }
             }
         }
@@ -581,6 +586,24 @@ int bv_open(const char *fileName, int mode) {
  *           prior to returning.
  */
 int bv_close(int bvfs_FD) {
+    int check = 0;
+    int inode_index = 0;
+    for(int i = 0; i < 256; i++){
+        if(inode_arr[i].address[0] == 0 bvfs_FD){
+            check = 1;
+            inode_index = i;
+        }
+    }
+    if(check == 0){
+        char err[] = "File not found.\n";
+        write(2, &err, sizeof(err));
+        return -1;
+    }
+    else{
+      write_inode();
+      write_superblock();
+      write_superblock_ids();
+    }
 }
 
 
@@ -646,16 +669,10 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         if(count < 512){
             printf("Going to write to spot: %d\n\n",adresses[0]*512);
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
-            write(GLOBAL_PFD, buf, 2);
-            /* for(int i = 0; i<count; i++){
-               printf("%p,", buf);
-               write(GLOBAL_PFD, &buf, 2);
-               ++(buf);
-               }*/
-            // Trying to read it back for testing
+            write(GLOBAL_PFD, buf, count);
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
             short num = 99;
-            size_t x = read(GLOBAL_PFD, &num, 2);
+            size_t x = read(GLOBAL_PFD, &num, count);
             printf("Trying to read: %d\n", num);
             printf("Read bytes: %ld\n",x);
             return count; 
