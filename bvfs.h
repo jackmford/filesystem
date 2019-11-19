@@ -879,6 +879,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
             inode_arr[inode_index].read_cursor += bytes_left;
             return total;
         }
+
         total += read(GLOBAL_PFD, buf, BLOCK_SIZE); 
         inode_arr[inode_index].read_cursor += BLOCK_SIZE;
         bytes_left -= BLOCK_SIZE;
