@@ -119,6 +119,13 @@ void give_back_block(short block_address){
     int open = 0;
     int offset = 0;
     int ctr = 0;
+    //Check if this is a superblock id, if it is, remove it from superblock_id array
+    for(int i=0; i<64; i++){
+      if(superblock_ids[i] == block_address){
+        superblock_ids[i] = 0;
+      }
+
+    }
     while(open != 1){
       printf("In while\n");
         for(int i = 0; i < 256; i++){
@@ -128,7 +135,7 @@ void give_back_block(short block_address){
                 break;
             }
             ctr++;
-            if(ctr = 255 && open == 0){
+            if(ctr == 255 && open == 0){
                 set_address_block();
             }
         }
@@ -740,7 +747,6 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
                           inode_arr[inode_index].address[x] = adresses[c];
                           c++;
                         }
-                        return count;
                       }
                     }
                   }
