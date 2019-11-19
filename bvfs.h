@@ -543,13 +543,18 @@ int bv_open(const char *fileName, int mode) {
     else if(found_flag == 1){
         if(mode == 2){
             printf("Returning %s\n", inode_arr[file_index].fileName);
+            for(int i = 0; i<(inode_arr[file_index].size/512+1)/512; i++){
+                give_back_block(inode_arr[file_index].address[i]);
+            }
+
             return inode_arr[file_index].address[0];
         }
         else if(mode == 1){
             for(int i = 0; i<MAX_FILE_BLOCKS-1; i++){
                 if(inode_arr[file_index].address[i] != 0 && inode_arr[file_index].address[i+1] == 0){
                     printf("Returning %s\n", inode_arr[file_index].fileName);
-                    return inode_arr[file_index].address[i];
+                    return inode_arr[file_index].address[i]*512 + inode_arr[file_index].size%512+1;
+                    //return inode_arr[file_index].address[i];
                 }
             }
         }
@@ -583,6 +588,24 @@ int bv_open(const char *fileName, int mode) {
  *           prior to returning.
  */
 int bv_close(int bvfs_FD) {
+    int check = 0;
+    int inode_index = 0;
+    for(int i = 0; i < 256; i++){
+        if(inode_arr[i].address[0] == bvfs_FD){
+            check = 1;
+            inode_index = i;
+        }
+    }
+    if(check == 0){
+        char err[] = "File not found.\n";
+        write(2, &err, sizeof(err));
+        return -1;
+    }
+    else{
+      write_inode();
+      write_superblock();
+      write_superblock_ids();
+    }
 }
 
 
@@ -612,11 +635,15 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     // Look for existing file in inode with corresponding FD
     printf("Numbytes to write: %ld\n", count);
     int inode_index = -1;
+    int address_index = -1;
     for(int i = 0; i<MAX_FILES; i++){
-        if(inode_arr[i].address[0] == bvfs_FD){
-            printf("Inode address: %d\n", inode_arr[i].address[0]);
-            inode_index = i;
+      for(int j = 0; j<128; j++){
+        if(inode_arr[i].address[j] == bvfs_FD){
+          printf("Inode address: %d\n", inode_arr[j].address[0]);
+          inode_index = i;
+          address_index = j;
         }
+      }
     }
 
     // Bail out if no file found
@@ -648,18 +675,35 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         if(count < 512){
             printf("Going to write to spot: %d\n\n",adresses[0]*512);
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
-            write(GLOBAL_PFD, buf, 2);
-            /* for(int i = 0; i<count; i++){
-               printf("%p,", buf);
-               write(GLOBAL_PFD, &buf, 2);
-               ++(buf);
-               }*/
-            // Trying to read it back for testing
+            write(GLOBAL_PFD, buf, count);
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
             short num = 99;
-            size_t x = read(GLOBAL_PFD, &num, 2);
+            size_t x = read(GLOBAL_PFD, &num, count);
             printf("Trying to read: %d\n", num);
             printf("Read bytes: %ld\n",x);
+
+            // Update the inode data
+            inode_arr[inode_index].size = inode_arr[inode_index].size+count;
+            inode_arr[inode_index].timeinfo = time(NULL);
+            // If the file was new, or in truncate mode
+            if(bvfs_FD == inode_arr[inode_index].address[0])
+              memcpy(inode_arr[inode_index].address, adresses, sizeof(adresses));
+            else{
+            // If the file was in concat mode, need to add on new addresses to end of address array
+              for(int j = 0; j<127; j++){
+                if(inode_arr[inode_index].address[j+1]==0 && inode_arr[inode_index].address[j]!=0){
+                  j++;
+                  int c = 0;
+                  for(int x = j; x<128; x++){
+                    if(c == numblocks)
+                     break;
+                    inode_arr[inode_index].address[x] = adresses[c];
+                    c++;
+                  }
+                  return count;
+                }
+              }
+            }
             return count; 
         }
         else{
@@ -669,8 +713,31 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
             while(index < numblocks){
                 lseek(GLOBAL_PFD, adresses[index]*512, SEEK_SET);
                 if(numblocks-1 == index){
-                    int bytesleft = count-(ctr);
-                    write(GLOBAL_PFD, buf, bytesleft);
+                  int bytesleft = count-(ctr);
+                  write(GLOBAL_PFD, buf, bytesleft);
+
+                  // Update the inode data
+                  inode_arr[inode_index].size = inode_arr[inode_index].size+count;
+                  inode_arr[inode_index].timeinfo = time(NULL);
+                  // If the file was new, or in truncate mode
+                  if(bvfs_FD == inode_arr[inode_index].address[0])
+                    memcpy(inode_arr[inode_index].address, adresses, sizeof(adresses));
+                  else{
+                  // If the file was in concat mode, need to add on new addresses to end of address array
+                    for(int j = 0; j<127; j++){
+                      if(inode_arr[inode_index].address[j+1]==0 && inode_arr[inode_index].address[j]!=0){
+                        j++;
+                        int c = 0;
+                        for(int x = j; x<128; x++){
+                          if(c == numblocks)
+                           break;
+                          inode_arr[inode_index].address[x] = adresses[c];
+                          c++;
+                        }
+                        return count;
+                      }
+                    }
+                  }
 
                 for (int k = 0; k < 260; k++) {
                     // Read back for testing
