@@ -187,7 +187,7 @@ short get_new_address() {
 
         // If found an open address (null addr)
         // Return it
-        printf("Looking at returning address: %d\n",superblock_array[i]);
+        //printf("Looking at returning address: %d\n",superblock_array[i]);
         if (superblock_array[i] != 0){
             return_addr = superblock_array[i];
             superblock_array[i] = 0;
@@ -465,6 +465,7 @@ int BV_WTRUNC = 2;
  */
 int bv_open(const char *fileName, int mode) {
     // Find null byte in fileName
+    printf("Opening: %s\n", fileName);
     int foundNull = 0;
     for (int i=0; i<strlen(fileName)+1; i++) {
         if(fileName[i] == '\0'){
@@ -515,9 +516,8 @@ int bv_open(const char *fileName, int mode) {
     }
 
     // Opening brand new file
-    printf("Inode index: %d\n", free_inode_index);
     if(found_flag == 0 && mode != 0){
-        printf("Making new file\n");
+        printf("Making new file %s\n", fileName);
         for(int j=0; j<256; j++){
             printf("%d\n", superblock_array[j]);
             // Found address in current superblock
@@ -545,6 +545,7 @@ int bv_open(const char *fileName, int mode) {
                 give_back_block(inode_arr[file_index].address[i]);
             }
 
+            printf("Opened %s and return %d as FD\n", inode_arr[file_index].fileName, inode_arr[file_index].address[0]);
             return inode_arr[file_index].address[0];
         }
         else if(mode == 1){
@@ -631,13 +632,14 @@ int bv_close(int bvfs_FD) {
  */
 int bv_write(int bvfs_FD, const void *buf, size_t count) {
     // Look for existing file in inode with corresponding FD
-    printf("Numbytes to write: %ld\n", count);
+    printf("Writing to bvfs_FD: %d\n", bvfs_FD);
     int inode_index = -1;
     int address_index = -1;
     for(int i = 0; i<MAX_FILES; i++){
       for(int j = 0; j<128; j++){
         if(inode_arr[i].address[j] == bvfs_FD){
-          printf("Inode address: %d\n", inode_arr[j].address[0]);
+          printf("Filename = %s\n", inode_arr[i].fileName);
+          printf("Inode address: %d\n", inode_arr[i].address[0]);
           inode_index = i;
           address_index = j;
         }
@@ -669,8 +671,14 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
             adresses[i] = tmp;
         }
 
+        if(numblocks > 128){
+          char err[] = "Too many blocks.\n";
+          write(2, &err, sizeof(err));
+          return -1;
+        }
+
         // Can we write it all if it is less than 512?
-        if(count < 512){
+        if(count <= 512){
             printf("Going to write to spot: %d\n\n",adresses[0]*512);
             lseek(GLOBAL_PFD, adresses[0]*512, SEEK_SET);
             write(GLOBAL_PFD, buf, count);
@@ -718,8 +726,9 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
                   inode_arr[inode_index].size = inode_arr[inode_index].size+count;
                   inode_arr[inode_index].timeinfo = time(NULL);
                   // If the file was new, or in truncate mode
-                  if(bvfs_FD == inode_arr[inode_index].address[0])
+                  if(bvfs_FD == inode_arr[inode_index].address[0]){
                     memcpy(inode_arr[inode_index].address, adresses, sizeof(adresses));
+                  }
                   else{
                   // If the file was in concat mode, need to add on new addresses to end of address array
                     for(int j = 0; j<127; j++){
@@ -742,8 +751,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
                     int xx[128];
                     lseek(GLOBAL_PFD, adresses[k]*BLOCK_SIZE, SEEK_SET);
                     read(GLOBAL_PFD, &xx, BLOCK_SIZE);
-                    for (int j = 0; j<128; j++)
-                        printf("Read back: %d\n", xx[j]);
+                    //for (int j = 0; j<128; j++)
+                        //printf("Read back: %d\n", xx[j]);
                 }
                     ctr+=bytesleft;
                     // Trying to read it back for testing
