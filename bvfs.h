@@ -850,10 +850,36 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
  *           prior to returning.
  */
 int bv_read(int bvfs_FD, void *buf, size_t count) {
-    // Seek to file start
-    // FUCKING IDIOT
-    lseek(GLOBAL_PFD, bvfs_FD*BLOCK_SIZE, SEEK_SET);
-    return read(GLOBAL_PFD, buf, count);
+    // Try to find bvfs_FD in inode array
+    short inode_index;
+    short found = -1;
+    for(int i = 0; i<MAX_FILES; i++){
+      if(inode_arr[i].address[0] == read_only_files[i] && inode_arr[i].address[0]==bvfs_FD){
+          inode_index = i;
+          inode_arr[i].read_cursor = bvfs_FD;
+          found = 1;
+          break;
+      }
+    }
+
+    if (found != 1)
+        return -1;
+
+    int bytes_left = count;
+    int total = 0;
+    int blocks_to_read = (inode_arr[inode_index].size + 512 -1)/512;
+    // Seek to the read cursor
+    for (int k = 0; k < blocks_to_read; k++) {
+        lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor * BLOCK_SIZE, SEEK_SET);
+        if (k == blocks_to_read-1) {
+            total += read(GLOBAL_PFD, buf, bytes_left); 
+            inode_arr[inode_index].read_cursor += bytes_left;
+            return total;
+        }
+        total += read(GLOBAL_PFD, buf, BLOCK_SIZE); 
+        inode_arr[inode_index].read_cursor += BLOCK_SIZE;
+        bytes_left -= BLOCK_SIZE;
+    }
 }
 
 
