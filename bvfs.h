@@ -128,12 +128,13 @@ void give_back_block(short block_address){
             }
             ctr++;
             if(ctr = 255 && open == 0){
-                //set_address_block();
+                set_address_block();
             }
         }
     }
     if(open == 1){
         superblock_array[offset] = block_address;
+        printf("Freed %d\n",block_address);
         write_superblock();
     }
     else if(open == 0){
@@ -145,6 +146,7 @@ void give_back_block(short block_address){
                 short return_addr = 0;
                 short i = 0;
                 short addr = get_new_address();
+                printf("Found new superblock @ %d\n", addr);
                 superblock_ids[i] = addr;
                 short newaddrs[256];
                 newaddrs[0] = block_address;
@@ -187,7 +189,7 @@ short get_new_address() {
 
         // If found an open address (null addr)
         // Return it
-        printf("Looking at returning address: %d\n",superblock_array[i]);
+        //printf("Looking at returning address: %d\n",superblock_array[i]);
         if (superblock_array[i] != 0){
             return_addr = superblock_array[i];
             superblock_array[i] = 0;
@@ -675,8 +677,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
                     int xx[128];
                     lseek(GLOBAL_PFD, adresses[k]*BLOCK_SIZE, SEEK_SET);
                     read(GLOBAL_PFD, &xx, BLOCK_SIZE);
-                    for (int j = 0; j<128; j++)
-                        printf("Read back: %d\n", xx[j]);
+                    //for (int j = 0; j<128; j++)
+                    //    printf("Read back: %d\n", xx[j]);
                 }
                     ctr+=bytesleft;
                     // Trying to read it back for testing
@@ -757,6 +759,7 @@ int bv_unlink(const char* fileName) {
     else{
         printf("Unlinking %s\n", inode_arr[inode_index].fileName);
         for(int i = 0; i<(inode_arr[inode_index].size/512+1)/512; i++){
+            printf("Calling givebackblock\n");
             give_back_block(inode_arr[inode_index].address[i]);
         }
         struct iNode tmp = {0, 0, 0, 0, 0};
