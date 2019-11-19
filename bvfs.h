@@ -506,9 +506,10 @@ int bv_open(const char *fileName, int mode) {
         if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
             found_flag = 1;
             file_index = i;
+            break;
         }
         // Read
-        if(found_flag == 0 && mode == 0){
+        if(i == 255 && found_flag == 0 && mode == 0){
             char err[] = "Opened in read mode but no file found.\n";
             write(2, &err, sizeof(err));
             return -1;
@@ -796,6 +797,9 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
  *           prior to returning.
  */
 int bv_read(int bvfs_FD, void *buf, size_t count) {
+    // Seek to file start
+    lseek(GLOBAL_PFD, bvfs_FD*BLOCK_SIZE, SEEK_SET);
+    return read(GLOBAL_PFD, buf, count);
 }
 
 
