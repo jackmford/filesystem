@@ -660,9 +660,9 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     int inode_index = -1;
     int address_index = -1;
     int seekto = 0;
-    // Check if read only
+
     for(int i = 0; i<MAX_FILES; i++){
-      if(inode_arr[i].address[0] == read_only_files[i]){
+      if(inode_arr[i].address[0] == read_only_files[i] && inode_arr[i].address[0]==bvfs_FD){
         char err[] = "File in read only mode.\n";
         write(2, &err, sizeof(err));
         return -1;
