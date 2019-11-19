@@ -615,6 +615,12 @@ int bv_close(int bvfs_FD) {
         return -1;
     }
     else{
+      for(int i = 0; i<256; i++){
+        if(read_only_files[i] == inode_arr[inode_index].address[0]){
+          read_only_files[i] = 0;
+          break;
+        }
+      }
       // Write file's inode back to file
       struct iNode tmp = inode_arr[inode_index];
       printf("SIZE OF INODE %ld\n", sizeof(inode_arr[inode_index]));
@@ -667,12 +673,15 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         if(inode_arr[i].address[0] == bvfs_FD){
           printf("Filename = %s\n", inode_arr[i].fileName);
           printf("Inode address: %d\n", inode_arr[i].address[0]);
+          // Truncate
           if(inode_arr[i].size == 0){
             inode_index = i;
             seekto = inode_arr[i].address[0]*512;
             break;
           }
           else{
+            // Concat
+            // Find last block in concat mode
             for(int j = 0; i<MAX_FILE_BLOCKS-1; j++){
                 if(inode_arr[i].address[j] != 0 && inode_arr[i].address[j+1] == 0){
                     printf("Returning %s\n", inode_arr[i].fileName);
@@ -692,7 +701,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
               lseek(GLOBAL_PFD, seekto, SEEK_SET);
 
             }
-            seekto+=512-(seekto%12);
+            seekto+=512-(seekto%512);
+            break;
           }
         }
     }
