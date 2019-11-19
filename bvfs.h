@@ -144,7 +144,7 @@ void give_back_block(short block_address){
     }
     if(open == 1){
         superblock_array[offset] = block_address;
-        printf("Freed %d\n",block_address);
+        //printf("Freed %d\n",block_address);
         write_superblock();
     }
     else if(open == 0){
@@ -860,7 +860,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
           printf("found file in read\n");
           inode_index = i;
           if (inode_arr[i].read_cursor == 0)
-              inode_arr[i].read_cursor = bvfs_FD;
+              inode_arr[i].read_cursor = bvfs_FD*512;
           printf("Found file %s in read\n", inode_arr[i].fileName);
           found = 1;
           break;
@@ -875,30 +875,32 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     int blocks_to_read = (count + 512 -1)/512;
 
     int arr[11000];
-    void * ptr = arr;
+    //void * ptr = arr;
 
     printf("Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
     if(bytes_left <= 512){
-        lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor * BLOCK_SIZE, SEEK_SET);
-        total += read(GLOBAL_PFD, ptr, bytes_left); 
+        lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
+        total += read(GLOBAL_PFD, buf, bytes_left); 
         inode_arr[inode_index].read_cursor += count;
         return total;
     }
 
     // Seek to the read cursor
+    printf("Blocks to read = %d\n", blocks_to_read);
     for (int k = 1; k < blocks_to_read; k++) {
         printf("Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
-        lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor * BLOCK_SIZE, SEEK_SET);
+        lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
         if (k == blocks_to_read-1) {
-            total += read(GLOBAL_PFD, ptr, bytes_left); 
+            total += read(GLOBAL_PFD, buf, bytes_left); 
             inode_arr[inode_index].read_cursor += bytes_left;
-            ptr+=bytes_left;
+            buf+=bytes_left;
             return total;
         }
-        total += read(GLOBAL_PFD, ptr, 512-(inode_arr[inode_index].read_cursor % 512)); 
-        inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[k];
-        bytes_left -= BLOCK_SIZE;
-        ptr+=512-(inode_arr[inode_index].read_cursor % 512);
+        int tmp = read(GLOBAL_PFD, buf, 512-(inode_arr[inode_index].read_cursor % 512)); 
+        total += tmp;
+        inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[k]*512;
+        bytes_left -= tmp;
+        buf+=512-(inode_arr[inode_index].read_cursor % 512);
     }
 }
 
