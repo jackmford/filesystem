@@ -128,7 +128,6 @@ void give_back_block(short block_address){
 
     }
     while(open != 1){
-      printf("In while\n");
         for(int i = 0; i < 256; i++){
             if(superblock_array[i] == 0){
                 open = 1;
@@ -599,13 +598,18 @@ int bv_open(const char *fileName, int mode) {
  *           prior to returning.
  */
 int bv_close(int bvfs_FD) {
+    printf("In close %d\n", bvfs_FD);
     int check = 0;
     int inode_index = 0;
     for(int i = 0; i < 256; i++){
-        if(inode_arr[i].address[0] == bvfs_FD){
+      printf("%s %d\n",inode_arr[i].fileName, inode_arr[i].address[0]);
+      for(int j = 0; j<128; j++){
+        if(bvfs_FD >= inode_arr[i].address[j] && bvfs_FD <= inode_arr[i].address[j]){
+          printf("In close: %d\n", inode_arr[i].address[j]);
             check = 1;
             inode_index = i;
         }
+      }
     }
     if(check == 0){
         char err[] = "File not found.\n";
@@ -613,7 +617,13 @@ int bv_close(int bvfs_FD) {
         return -1;
     }
     else{
-      write_inode();
+      // Write file's inode back to file
+      struct iNode tmp = inode_arr[inode_index];
+      printf("SIZE OF INODE %ld\n", sizeof(inode_arr[inode_index]));
+      short offset = inode_index*512+512;
+      lseek(GLOBAL_PFD, offset, SEEK_SET);
+      write(GLOBAL_PFD, (void*)&tmp, sizeof(tmp));
+      return 0;
     }
 }
 
