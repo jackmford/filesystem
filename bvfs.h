@@ -857,6 +857,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     short found = -1;
     for(int i = 0; i<MAX_FILES; i++){
       if(inode_arr[i].address[0] == read_only_files[i] && inode_arr[i].address[0]==bvfs_FD){
+          printf("found file in read\n");
           inode_index = i;
           inode_arr[i].read_cursor = bvfs_FD;
           found = 1;
