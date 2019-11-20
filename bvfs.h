@@ -506,9 +506,9 @@ int bv_open(const char *fileName, int mode) {
     int found_flag = 0;
     int file_index = -1;
     for(int i = 0; i<256; i++){
-        //printf("comparing {%s} to {%s} infilenames\n",inode_arr[i].fileName, fileName);
+        printf("comparing {%s} to {%s} infilenames\n",inode_arr[i].fileName, fileName);
         if(strcmp(inode_arr[i].fileName, fileName)  == 0 ){
-        //printf("comparing %s to %s infilenames\n",inode_arr[i].fileName, fileName);
+        printf("found successfuyl comparing %s to %s infilenames\n",inode_arr[i].fileName, fileName);
             found_flag = 1;
             file_index = i;
             break;
@@ -915,9 +915,9 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     int total = 0;
     int blocks_to_read = (count + 512 -1)/512;
 
-    printf("READ Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
+    //printf("READ Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
     if(bytes_left <= 512){
-        printf("READ Cursor is at %d and inside < 512 in read with bytes left = %d\n", inode_arr[inode_index].read_cursor, bytes_left);
+        //printf("READ Cursor is at %d and inside < 512 in read with bytes left = %d\n", inode_arr[inode_index].read_cursor, bytes_left);
         lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
         read(GLOBAL_PFD, buf, bytes_left); 
         total+=bytes_left;
