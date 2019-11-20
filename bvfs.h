@@ -551,8 +551,11 @@ int bv_open(const char *fileName, int mode) {
       for(int i = 0; i<MAX_FILES; i++){
         if(read_only_files[i] == 0){
           read_only_files[i] = inode_arr[file_index].address[0];
+          printf("%s put in read only with value %d at pos %d\n", inode_arr[file_index].fileName, read_only_files[i], i);
+          break;
         }
       }
+      printf("Opening %s FD = %d\n", inode_arr[file_index].fileName, inode_arr[file_index].address[0]);
       inode_arr[file_index].is_open = 1;
       return inode_arr[file_index].address[0];
     }
@@ -824,12 +827,20 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
  */
 int bv_read(int bvfs_FD, void *buf, size_t count) {
   // Try to find bvfs_FD in inode array
-  printf("BVFS FD %d\n", bvfs_FD);
+  //printf("BVFS FD %d\n", bvfs_FD);
   short inode_index = -1;
   int found = -1;
+  int read_found = 0;
   for(int i = 0; i<MAX_FILES; i++){
-    if(inode_arr[i].address[0] == read_only_files[i] && inode_arr[i].address[0]==bvfs_FD){
-      printf("found %s with FD %d\n", inode_arr[i].fileName, inode_arr[i].address[0]);
+    if(bvfs_FD == read_only_files[i]){
+      read_found = 1;
+    }
+  }
+
+  for(int i = 0; i<MAX_FILES; i++){
+    if(read_found == 1 && inode_arr[i].address[0]==bvfs_FD){
+      printf("in loop with %s\n", inode_arr[i].fileName);
+
       found = 1;
       inode_index = i;
       if (inode_arr[i].read_cursor == 0)
