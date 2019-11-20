@@ -900,13 +900,14 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
             write(2, &err, sizeof(err));
             return -1;
           }
-          //printf("Found file %s in read\n", inode_arr[i].fileName);
+          printf("Found file %s in read\n", inode_arr[i].fileName);
           found = 1;
           break;
       }
     }
 
     if (found != 1) {
+        printf("about to return -1 in not found\n");
         return -1;
     }
 
@@ -914,13 +915,15 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     int total = 0;
     int blocks_to_read = (count + 512 -1)/512;
 
-    //printf("READ Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
+    printf("READ Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
     if(bytes_left <= 512){
-        //printf("READ Cursor is at %d and inside < 512 in read with bytes left = %d\n", inode_arr[inode_index].read_cursor, bytes_left);
+        printf("READ Cursor is at %d and inside < 512 in read with bytes left = %d\n", inode_arr[inode_index].read_cursor, bytes_left);
         lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
-        total += read(GLOBAL_PFD, buf, bytes_left); 
+        read(GLOBAL_PFD, buf, bytes_left); 
+        total+=bytes_left;
         //buf+=bytes_left;
         inode_arr[inode_index].read_cursor += bytes_left;
+        printf("about tor eutrn total in < 512 %d\n",total);
         return total;
     }
 
@@ -933,6 +936,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
             total += read(GLOBAL_PFD, buf, bytes_left); 
             inode_arr[inode_index].read_cursor += bytes_left;
             buf+=bytes_left;
+            printf("about tor eutrn total in reg %d\n",total);
             return total;
         }
         int tmp = read(GLOBAL_PFD, buf, 512-(inode_arr[inode_index].read_cursor % 512)); 
