@@ -506,13 +506,16 @@ int bv_open(const char *fileName, int mode) {
     int found_flag = 0;
     int file_index = -1;
     for(int i = 0; i<256; i++){
+        //printf("comparing {%s} to {%s} infilenames\n",inode_arr[i].fileName, fileName);
         if(strcmp(inode_arr[i].fileName, fileName)  == 0 ){
+        //printf("comparing %s to %s infilenames\n",inode_arr[i].fileName, fileName);
             found_flag = 1;
             file_index = i;
             break;
         }
         // Read
     }
+    //printf("found flag: %d\n", found_flag);
         if(found_flag == 0 && mode == 0){
             char err[] = "Opened in read mode but no file found.\n";
             write(2, &err, sizeof(err));
@@ -540,7 +543,14 @@ int bv_open(const char *fileName, int mode) {
                 time_t newtime = time(NULL);
                 char name[32];
                 struct iNode tmp;
+                //printf("new file name is [%s]\n", fileName);
+                //printf("length ofnew filename is [%d]\n", strlen(fileName));
                 memcpy(tmp.fileName, fileName, strlen(fileName));
+                for (int k = strlen(fileName); k < 32; k++) {
+                    tmp.fileName[k] = '\0';
+                }
+                //printf("%s is new filename!\n",tmp.fileName);
+                //memcpy(tmp.fileName, name, 32);
                 tmp.address[0] = superblock_array[j];
                 for (int k = 1; k<128;k++)
                     tmp.address[k] = 0;
@@ -573,7 +583,7 @@ int bv_open(const char *fileName, int mode) {
         else if(mode == 1){
           // Concat
             inode_arr[file_index].is_open = 1;
-            inode_arr[file_index].read_cursor = 512*(inode_arr[file_index].size/512)+inode_arr[file_index].size%512;
+            inode_arr[file_index].read_cursor = 512*inode_arr[file_index].address[0]+(512*(inode_arr[file_index].size/512))+inode_arr[file_index].size%512;
             return inode_arr[file_index].address[0];
         }
         else if(mode == 0){
@@ -709,6 +719,10 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
               lseek(GLOBAL_PFD, inode_arr[i].read_cursor, SEEK_SET);
               //printf("Just set cursor to first block: %d\n",inode_arr[i].read_cursor);
           }
+          else {
+              lseek(GLOBAL_PFD, inode_arr[i].read_cursor, SEEK_SET);
+              //printf("Just set cursor to block: %d\n",inode_arr[i].read_cursor);
+          }
           // If cursor is at end of file, can no longer read -- file must be closed?
           /*if (inode_arr[i].read_cursor == inode_arr[i].address[0]*512+inode_arr[i].size) {
               //printf("nonono file: [%d] cursor is at %d and end of file is %d\n",inode_arr[i].address[0], inode_arr[i].read_cursor,inode_arr[i].address[0]*512+inode_arr[i].size);
@@ -738,16 +752,17 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         move to that block
         repeat
     */
-    //printf("BEGIN: Cursor set to %d in fD: %d\n",inode_arr[inode_index].read_cursor, bvfs_FD);
+    //printf("BEGIN: Cursor set to %d with bytes left: %d in fD: %d\n",inode_arr[inode_index].read_cursor,bytes_left, bvfs_FD);
     while (bytes_left > 0) {
         // Cursor is somewhere in middle of a block
         // Write the missing chunk to fill it
-        printf("total is %d\n", total);
-        printf("bytes left:  %d for FD: [%d]\n", bytes_left, bvfs_FD);
+        //printf("total is %d\n", total);
+        //printf("bytes left:  %d for FD: [%d]\n", bytes_left, bvfs_FD);
         if (inode_arr[inode_index].read_cursor % 512 != 0) {
-            int writing_bytes = 512-(inode_arr[inode_index].read_cursor % 512);
+            int writing_bytes = (inode_arr[inode_index].read_cursor % 512);
             int tmp = write(GLOBAL_PFD, buf, writing_bytes); 
             //total += tmp;
+            //printf("Inside weird block with writing bytes = %d\n", writing_bytes);
             total += writing_bytes;
             bytes_left -= writing_bytes; 
             buf+=writing_bytes;
@@ -761,9 +776,10 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         }
         // There is less than 512 bytes to write
         else if (bytes_left < 512) {
-            printf("there was less than 512 byutes\n");
             int tmp = write(GLOBAL_PFD, buf, bytes_left);
             total += bytes_left;
+            //printf("less than 512 gives total = %d\n", total);
+            inode_arr[inode_index].read_cursor += bytes_left;
             bytes_left = 0;
             break;
         }
@@ -898,18 +914,20 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     int total = 0;
     int blocks_to_read = (count + 512 -1)/512;
 
-    //printf("Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
+    //printf("READ Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor, inode_arr[inode_index].address[0]);
     if(bytes_left <= 512){
+        //printf("READ Cursor is at %d and inside < 512 in read with bytes left = %d\n", inode_arr[inode_index].read_cursor, bytes_left);
         lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
         total += read(GLOBAL_PFD, buf, bytes_left); 
-        inode_arr[inode_index].read_cursor += count;
+        //buf+=bytes_left;
+        inode_arr[inode_index].read_cursor += bytes_left;
         return total;
     }
 
     // Seek to the read cursor
     //printf("Blocks to read = %d\n", blocks_to_read);
     for (int k = 1; k < blocks_to_read; k++) {
-        //printf("Cursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor/512, inode_arr[inode_index].address[0]);
+        //printf("READ READCursor is at %d and first block of file is %d\n", inode_arr[inode_index].read_cursor/512, inode_arr[inode_index].address[0]);
         lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
         if (k == blocks_to_read-1) {
             total += read(GLOBAL_PFD, buf, bytes_left); 
