@@ -539,6 +539,7 @@ int bv_open(const char *fileName, int mode) {
       }
       inode_arr[file_index].size = 0;
       inode_arr[file_index].is_open = 1;
+      inode_arr[file_index].read_cursor = 0;
       return inode_arr[file_index].address[0];
     }
     else if(mode == 1){
@@ -557,6 +558,7 @@ int bv_open(const char *fileName, int mode) {
       }
       printf("Opening %s FD = %d\n", inode_arr[file_index].fileName, inode_arr[file_index].address[0]);
       inode_arr[file_index].is_open = 1;
+      inode_arr[file_index].read_cursor = 0;
       return inode_arr[file_index].address[0];
     }
   }
@@ -618,7 +620,7 @@ int bv_close(int bvfs_FD) {
     }
     // Write file's inode back to file to save
     struct iNode tmp = inode_arr[inode_index];
-    inode_arr[inode_index].read_cursor = 0;
+  //  inode_arr[inode_index].read_cursor = 0;
     inode_arr[inode_index].is_open = 0;
     tmp.read_cursor = 0; // Reset file cursor
     tmp.is_open = 0; // Set file to 'closed'
@@ -628,11 +630,6 @@ int bv_close(int bvfs_FD) {
     return 0;
   }
 }
-
-
-
-
-
 
 
 /*
@@ -679,6 +676,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
         inode_arr[i].read_cursor = bvfs_FD*BLOCK_SIZE;
         lseek(GLOBAL_PFD, inode_arr[i].read_cursor, SEEK_SET);
       }
+      else{
+      }
       // If cursor is at end of file, can no longer read -- file must be closed?
       /*if (inode_arr[i].read_cursor == inode_arr[i].address[0]*512+inode_arr[i].size) {
         char err[] = "EOF error.\n";
@@ -710,25 +709,49 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     // Cursor is somewhere in middle of a block
     // Write the missing chunk to fill it
     if (inode_arr[inode_index].read_cursor % BLOCK_SIZE != 0) {
-      int writing_bytes = BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE);
-      int tmp = write(GLOBAL_PFD, buf, writing_bytes); 
+      //int writing_bytes = BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE);
+      lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
+      int writing_bytes = (inode_arr[inode_index].read_cursor % BLOCK_SIZE);
+      int tmp;
+      if(bytes_left < writing_bytes){
+        tmp = write(GLOBAL_PFD, buf, bytes_left); 
+      }
+      else{
+        tmp = write(GLOBAL_PFD, buf, writing_bytes); 
+      }
+      printf("Writing first spot pos: %d Bytes %d\n", inode_arr[inode_index].read_cursor, tmp);
       total += tmp;
       bytes_left -= writing_bytes; 
       buf+=writing_bytes;
+      if(bytes_left <= 0){
+        printf("First spot adding to read cursor\n");
+        inode_arr[inode_index].read_cursor += tmp;
+        break;
+      }
     }
     // There is an entire block left to write
-    else if (bytes_left >= BLOCK_SIZE) {
+    else if (bytes_left > BLOCK_SIZE) {
       int tmp = write(GLOBAL_PFD, buf, BLOCK_SIZE);
+      printf("Writing second spot pos: %d Bytes %d\n", inode_arr[inode_index].read_cursor, tmp);
       total += tmp;
       bytes_left -= BLOCK_SIZE;
       buf+=BLOCK_SIZE;
     }
     // There is less than 512 bytes to write
-    else if (bytes_left < BLOCK_SIZE) {
+    else if (bytes_left <= BLOCK_SIZE) {
       //printf("there was less than 512 byutes\n");
+      lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
       int tmp = write(GLOBAL_PFD, buf, bytes_left);
+      printf("Writing third spot pos: %d Bytes %d\n", inode_arr[inode_index].read_cursor, tmp);
+      //inode_arr[inode_index].read_cursor += tmp;
       total += tmp;
+      buf+=bytes_left;
       bytes_left = 0;
+      if(bytes_left <= 0){
+        inode_arr[inode_index].read_cursor += tmp;
+        break;
+      }
+      break;
     }
 
     if (bytes_left > 0) {
@@ -739,9 +762,11 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
       inode_arr[inode_index].read_cursor = new_addr * BLOCK_SIZE;
       //printf("Cursor set to %d in fD: %d\n",inode_arr[inode_index].read_cursor/512, bvfs_FD);
       lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
+      //printf("Writing pos: %d\n", inode_arr[inode_index].read_cursor);
     }
-    else
+    else{
       break;
+    }
   }
 
   // Make changes to inode
@@ -772,8 +797,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     }
 
   }
-  for (int i = 0; i<MAX_FILE_BLOCKS; i++)
-    return total;
+  printf("Returning %d\n", total);
+  return total;
 
 
   /*
@@ -866,29 +891,30 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
   int total = 0;
   int blocks_to_read = (count + BLOCK_SIZE -1)/BLOCK_SIZE;
 
-  //if(bytes_left <= BLOCK_SIZE && inode_arr[inode_index].read_cursor%512 == 0){
-  if(bytes_left <= BLOCK_SIZE){
+  int ctr = 1;
+  while(bytes_left > 0){
     lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
-    total += read(GLOBAL_PFD, buf, bytes_left); 
-    inode_arr[inode_index].read_cursor += count;
-    return total;
-  }
-
-  // Seek to the read cursor
-  for (int k = 1; k < blocks_to_read; k++) {
-    lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
-    if (k == blocks_to_read-1) {
+    if(bytes_left <= 512){
+      //lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
       total += read(GLOBAL_PFD, buf, bytes_left); 
-      inode_arr[inode_index].read_cursor += bytes_left;
+      //printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
+      printf("Bytes left = %d\n", bytes_left);
+      printf("Total = %d\n", total);
       buf+=bytes_left;
+      inode_arr[inode_index].read_cursor += bytes_left;
       return total;
     }
-    int tmp = read(GLOBAL_PFD, buf, BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE)); 
-    total += tmp;
-    inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[k]*BLOCK_SIZE;
-    bytes_left -= tmp;
-    buf+=BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE);
+    else{
+      //printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
+      int tmp = read(GLOBAL_PFD, buf, BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE)); 
+      total += tmp;
+      inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[ctr]*BLOCK_SIZE;
+      bytes_left -= tmp;
+      buf+=BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE);
+      ctr++;
+    }
   }
+  return total;
 }
 
 
