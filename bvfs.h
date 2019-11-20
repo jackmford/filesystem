@@ -567,11 +567,13 @@ int bv_open(const char *fileName, int mode) {
             }
             inode_arr[file_index].size = 0;
             inode_arr[file_index].is_open = 1;
+            inode_arr[file_index].read_cursor = 0;
             return inode_arr[file_index].address[0];
         }
         else if(mode == 1){
           // Concat
             inode_arr[file_index].is_open = 1;
+            inode_arr[file_index].read_cursor = 512*(inode_arr[file_index].size/512)+inode_arr[file_index].size%512;
             return inode_arr[file_index].address[0];
         }
         else if(mode == 0){
@@ -583,6 +585,7 @@ int bv_open(const char *fileName, int mode) {
               }
             }
             inode_arr[file_index].is_open = 1;
+            inode_arr[file_index].read_cursor = 0;
             return inode_arr[file_index].address[0];
         }
     }
@@ -645,9 +648,7 @@ int bv_close(int bvfs_FD) {
       }
       // Write file's inode back to file
       struct iNode tmp = inode_arr[inode_index];
-        inode_arr[inode_index].read_cursor = 0;
-        inode_arr[inode_index].is_open = 0;
-      tmp.read_cursor = 0; // Reset file cursor
+      inode_arr[inode_index].is_open = 0;
       tmp.is_open = 0; // Set file to 'closed'
       //printf("SIZE OF INODE %ld\n", sizeof(inode_arr[inode_index]));
       short offset = inode_index*512+512;
@@ -741,26 +742,30 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     while (bytes_left > 0) {
         // Cursor is somewhere in middle of a block
         // Write the missing chunk to fill it
+        printf("total is %d\n", total);
+        printf("bytes left:  %d for FD: [%d]\n", bytes_left, bvfs_FD);
         if (inode_arr[inode_index].read_cursor % 512 != 0) {
             int writing_bytes = 512-(inode_arr[inode_index].read_cursor % 512);
             int tmp = write(GLOBAL_PFD, buf, writing_bytes); 
-            total += tmp;
+            //total += tmp;
+            total += writing_bytes;
             bytes_left -= writing_bytes; 
             buf+=writing_bytes;
         }
         // There is an entire block left to write
         else if (bytes_left >= 512) {
             int tmp = write(GLOBAL_PFD, buf, BLOCK_SIZE);
-            total += tmp;
+            total += 512;
             bytes_left -= BLOCK_SIZE;
             buf+=BLOCK_SIZE;
         }
         // There is less than 512 bytes to write
         else if (bytes_left < 512) {
-            //printf("there was less than 512 byutes\n");
+            printf("there was less than 512 byutes\n");
             int tmp = write(GLOBAL_PFD, buf, bytes_left);
-            total += tmp;
+            total += bytes_left;
             bytes_left = 0;
+            break;
         }
 
         if (bytes_left > 0) {
@@ -809,6 +814,7 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
     }
     for (int i = 0; i<128; i++)
         //printf("I am address [%d]\n", inode_arr[inode_index].address[i]);
+        //printf("total is %d\n", total);
     return total;
 
     
@@ -884,8 +890,9 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
       }
     }
 
-    if (found != 1)
+    if (found != 1) {
         return -1;
+    }
 
     int bytes_left = count;
     int total = 0;
