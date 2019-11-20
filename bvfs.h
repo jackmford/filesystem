@@ -53,7 +53,8 @@ struct iNode{
     time_t timeinfo; // 8 bytes
     short address[128]; // 256 bytes
     int read_cursor= 0;
-    int dummydata[50];
+    int is_open = 0;
+    int dummydata[49];
 };
 
 // Global variables
@@ -543,6 +544,7 @@ int bv_open(const char *fileName, int mode) {
                 tmp.size = 0;
                 tmp.timeinfo = newtime;
                 tmp.read_cursor = 0;
+                tmp.is_open = 1;
                 inode_arr[free_inode_index] = tmp;
                 //printf("Address: %d\n", inode_arr[free_inode_index].address[0]);
                 //printf("Filename: %s\n", inode_arr[free_inode_index].fileName);
@@ -560,10 +562,12 @@ int bv_open(const char *fileName, int mode) {
                 give_back_block(inode_arr[file_index].address[i]);
             }
             inode_arr[file_index].size = 0;
+            inode_arr[file_index].is_open = 1;
             return inode_arr[file_index].address[0];
         }
         else if(mode == 1){
           // Concat
+            inode_arr[file_index].is_open = 1;
             return inode_arr[file_index].address[0];
         }
         else if(mode == 0){
@@ -574,6 +578,7 @@ int bv_open(const char *fileName, int mode) {
                 read_only_files[i] = inode_arr[file_index].address[0];
               }
             }
+            inode_arr[file_index].is_open = 1;
             return inode_arr[file_index].address[0];
         }
     }
@@ -610,6 +615,12 @@ int bv_close(int bvfs_FD) {
       for(int j = 0; j<128; j++){
         if(bvfs_FD == inode_arr[i].address[0]) {
           //printf("In close: %d\n", inode_arr[i].address[j]);
+            // If file not open, don't return anything
+            if (inode_arr[i].is_open == 0) {
+                char err[] = "File not open.\n";
+                write(2, &err, sizeof(err));
+                return -1;
+            }
             check = 1;
             inode_index = i;
             break;
@@ -631,6 +642,7 @@ int bv_close(int bvfs_FD) {
       // Write file's inode back to file
       struct iNode tmp = inode_arr[inode_index];
       tmp.read_cursor = 0; // Reset file cursor
+      tmp.is_open = 0; // Set file to 'closed'
       //printf("SIZE OF INODE %ld\n", sizeof(inode_arr[inode_index]));
       short offset = inode_index*512+512;
       lseek(GLOBAL_PFD, offset, SEEK_SET);
@@ -863,8 +875,10 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
               inode_arr[i].read_cursor = bvfs_FD*512;
           // If cursor is at end of file, can no longer read -- file must be closed?
           if (inode_arr[i].read_cursor == inode_arr[i].address[0]*512+inode_arr[i].size) {
-              //printf("nonono cursor is at %d and end of file is %d\n", inode_arr[i].read_cursor,inode_arr[i].address[0]*512+inode_arr[i].size);
-              return -1;
+              printf("nonono file: [%d] cursor is at %d and end of file is %d\n",inode_arr[i].address[0], inode_arr[i].read_cursor,inode_arr[i].address[0]*512+inode_arr[i].size);
+            char err[] = "EOF error.\n";
+            write(2, &err, sizeof(err));
+            return -1;
           }
           //printf("Found file %s in read\n", inode_arr[i].fileName);
           found = 1;
