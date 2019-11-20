@@ -506,18 +506,18 @@ int bv_open(const char *fileName, int mode) {
     int found_flag = 0;
     int file_index = -1;
     for(int i = 0; i<256; i++){
-        if(strcmp(inode_arr[i].fileName, fileName) == 0 && mode == 0){
+        if(strcmp(inode_arr[i].fileName, fileName)  == 0 ){
             found_flag = 1;
             file_index = i;
             break;
         }
         // Read
-        if(i == 255 && found_flag == 0 && mode == 0){
+    }
+        if(found_flag == 0 && mode == 0){
             char err[] = "Opened in read mode but no file found.\n";
             write(2, &err, sizeof(err));
             return -1;
         }
-    }
 
     // Look through inode array for free spot
     int free_inode_index = -1;
@@ -964,8 +964,13 @@ int bv_unlink(const char* fileName) {
         for(int i = 0; i<(inode_arr[inode_index].size+512-1)/512; i++){
             give_back_block(inode_arr[inode_index].address[i]);
         }
+        for(int i = 0; i<MAX_FILES; i++){
+            if(read_only_files[i] == inode_arr[inode_index].address[0])
+                read_only_files[i] = 0;
+        }
         struct iNode tmp = {0, 0, 0, 0, 0, 0};
         inode_arr[inode_index] = tmp;
+        write_inode();
         return 0;
     }
 }
