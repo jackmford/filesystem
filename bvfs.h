@@ -533,7 +533,7 @@ int bv_open(const char *fileName, int mode) {
   else if(found_flag == 1){
     if(mode == 2){
       // Truncate, return first address after giving others back to system for use
-      for(int i = 0; i<(inode_arr[file_index].size/BLOCK_SIZE+1)/BLOCK_SIZE; i++){
+      for(int i = 1; i<(inode_arr[file_index].size/BLOCK_SIZE+1)/BLOCK_SIZE; i++){
         give_back_block(inode_arr[file_index].address[i]);
         inode_arr[file_index].address[i] = 0;
       }
@@ -621,8 +621,8 @@ int bv_close(int bvfs_FD) {
     // Write file's inode back to file to save
     struct iNode tmp = inode_arr[inode_index];
   //  inode_arr[inode_index].read_cursor = 0;
-    inode_arr[inode_index].is_open = 0;
-    tmp.read_cursor = 0; // Reset file cursor
+  //  inode_arr[inode_index].is_open = 0;
+  //  tmp.read_cursor = 0; // Reset file cursor
     tmp.is_open = 0; // Set file to 'closed'
     short offset = inode_index*BLOCK_SIZE+BLOCK_SIZE;
     lseek(GLOBAL_PFD, offset, SEEK_SET);
@@ -694,7 +694,8 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
 
   int bytes_left = count;
   int total = 0;
-  int new_addrs_loc = 1;
+  //int new_addrs_loc = 1;
+  int new_addrs_loc = 0;
   int new_blocks = 0;
 
   /* 
@@ -713,16 +714,23 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
       lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
       int writing_bytes = (inode_arr[inode_index].read_cursor % BLOCK_SIZE);
       int tmp;
-      if(bytes_left < writing_bytes){
+      int minbytes;
+      if(bytes_left < 512-writing_bytes){
         tmp = write(GLOBAL_PFD, buf, bytes_left); 
+        printf("Wrote %d\n", tmp);
+        minbytes = bytes_left;
       }
       else{
-        tmp = write(GLOBAL_PFD, buf, writing_bytes); 
+        tmp = write(GLOBAL_PFD, buf, 512-writing_bytes); 
+        printf("Wrote %d\n", tmp);
+        minbytes = 512-writing_bytes;
       }
       printf("Writing first spot pos: %d Bytes %d\n", inode_arr[inode_index].read_cursor, tmp);
       total += tmp;
-      bytes_left -= writing_bytes; 
-      buf+=writing_bytes;
+      //bytes_left -= writing_bytes; 
+      bytes_left -= minbytes;
+      //buf+=writing_bytes;
+      buf+=minbytes;
       if(bytes_left <= 0){
         printf("First spot adding to read cursor\n");
         inode_arr[inode_index].read_cursor += tmp;
@@ -736,6 +744,10 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
       total += tmp;
       bytes_left -= BLOCK_SIZE;
       buf+=BLOCK_SIZE;
+      if(bytes_left <= 0){
+        inode_arr[inode_index].read_cursor += tmp;
+        break;
+      }
     }
     // There is less than 512 bytes to write
     else if (bytes_left <= BLOCK_SIZE) {
@@ -745,13 +757,14 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
       printf("Writing third spot pos: %d Bytes %d\n", inode_arr[inode_index].read_cursor, tmp);
       //inode_arr[inode_index].read_cursor += tmp;
       total += tmp;
-      buf+=bytes_left;
-      bytes_left = 0;
+      buf+=tmp;
+      bytes_left -= tmp;
+      //bytes_left = 0;
       if(bytes_left <= 0){
         inode_arr[inode_index].read_cursor += tmp;
         break;
       }
-      break;
+      //break;
     }
 
     if (bytes_left > 0) {
@@ -772,26 +785,34 @@ int bv_write(int bvfs_FD, const void *buf, size_t count) {
   // Make changes to inode
   inode_arr[inode_index].timeinfo = time(NULL);
   inode_arr[inode_index].size += total;
+  short last_place = 0;
   for (int i = 0; i<MAX_FILE_BLOCKS;i++) {
   }
   // If we on truncate
   if (inode_arr[inode_index].address[0] != bvfs_FD && inode_arr[inode_index].address[1] == 0) {
     memcpy(inode_arr[inode_index].address, new_addrs, sizeof(new_addrs));
+    last_place = 0;
   }
   // If we on concat
   else {
     // Find the last address we need have in addresses
-    short last_place = 0;
+    //short last_place = 0;
     for (short i = 0; i < 127; i++) {
       if (inode_arr[inode_index].address[i] != 0 && inode_arr[inode_index].address[i+1] == 0) {
         last_place = i+1;
+        if(inode_arr[inode_index].size<512)
+          last_place = 0;
         break;
       }
     }
 
     // Write the new addresses to the addresses
-    short t = 1;
-    for (short i = last_place; i <= new_blocks; i++) {
+    //short t = 1;
+    //short t = last_place;
+    short t = 0;
+    printf("%d last place, %d new blocks\n", last_place, new_blocks);
+    for (short i = last_place; i < new_blocks+last_place; i++) {
+      printf("in loop putting in %d at %d\n", new_addrs[t], i);
       inode_arr[inode_index].address[i] = new_addrs[t];
       t++;
     }
@@ -897,7 +918,7 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
     if(bytes_left <= 512){
       //lseek(GLOBAL_PFD, inode_arr[inode_index].read_cursor, SEEK_SET);
       total += read(GLOBAL_PFD, buf, bytes_left); 
-      //printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
+      printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
       printf("Bytes left = %d\n", bytes_left);
       printf("Total = %d\n", total);
       buf+=bytes_left;
@@ -905,12 +926,13 @@ int bv_read(int bvfs_FD, void *buf, size_t count) {
       return total;
     }
     else{
-      //printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
+      printf("Reading pos %d\n", inode_arr[inode_index].read_cursor);
       int tmp = read(GLOBAL_PFD, buf, BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE)); 
       total += tmp;
-      inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[ctr]*BLOCK_SIZE;
-      bytes_left -= tmp;
       buf+=BLOCK_SIZE-(inode_arr[inode_index].read_cursor % BLOCK_SIZE);
+      //inode_arr[inode_index].read_cursor = inode_arr[inode_index].address[ctr]*BLOCK_SIZE;
+      inode_arr[inode_index].read_cursor += tmp;;
+      bytes_left -= tmp;
       ctr++;
     }
   }
@@ -963,6 +985,7 @@ int bv_unlink(const char* fileName) {
     for(int i = 0; i<MAX_FILES; i++){
       if(read_only_files[i] == inode_arr[inode_index].address[0])
         read_only_files[i] = 0;
+        break;
     }
     struct iNode tmp = {0, 0, 0, 0, 0, 0};
     inode_arr[inode_index] = tmp;
